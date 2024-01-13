@@ -43,6 +43,20 @@ LIST(APPEND BOOST_COMPONENTS coroutine thread date_time filesystem system progra
 # boost::endian is also required, but FindBoost can't handle header-only libs
 SET( Boost_USE_STATIC_LIBS ON CACHE STRING "ON or OFF" )
 
+# UGLY FIX cmake on mac not finding libs (https://stackoverflow.com/questions/54068035/linking-not-working-in-homebrews-cmake-since-mojave)
+# TODO: Remove when not needed anymore
+IF(APPLE)
+	MESSAGE(STATUS "UGLY FIX: force HomeBrew library search path (due to cmake bug?) - Remove when not needed anymore")
+	execute_process(
+		COMMAND brew --prefix
+		RESULT_VARIABLE HOMEBREW_RESULT
+		OUTPUT_VARIABLE HOMEBREW_PREFIX
+		OUTPUT_STRIP_TRAILING_WHITESPACE
+	)
+	link_directories(${HOMEBREW_PREFIX}/lib)
+	link_directories(${HOMEBREW_PREFIX}/opt/icu4c/lib)
+ENDIF()
+
 # Configure secp256k1-zkp
 if ( WIN32 )
     # autoconf won't work here, hard code the defines

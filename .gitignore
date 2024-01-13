@@ -49,3 +49,5 @@ git_revision.cpp
 GitSHA3.cpp
 
 task_cancel_test
+
+build
