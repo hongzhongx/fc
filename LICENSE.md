@@ -12,7 +12,9 @@ Furthermore, this repository includes code from third party authors. See the lis
 
 ----
 
-Copyright (c) 2023-2024 Graphene Protocol contributors
+Copyright (c) Graphene Protocol contributors
+
+MIT License
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
