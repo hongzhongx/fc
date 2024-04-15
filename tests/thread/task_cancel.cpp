@@ -87,8 +87,6 @@ BOOST_AUTO_TEST_CASE( test_non_preemptable_assertion )
     ASSERT_TASK_NOT_PREEMPTED();
     {
       ASSERT_TASK_NOT_PREEMPTED();
-      int i = 4;
-      i += 2;
     }
     fc::usleep(fc::seconds(1)); // this should assert
   }
