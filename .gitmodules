@@ -4,3 +4,6 @@
 [submodule "vendor/editline"]
     path = vendor/editline
     url = https://github.com/troglobit/editline.git
+[submodule "vendor/websocketpp"]
+	path = vendor/websocketpp
+	url = https://github.com/hongzhongx/websocketpp.git
