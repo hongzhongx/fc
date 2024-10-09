@@ -2,7 +2,6 @@
 
 #include <fc/crypto/digest.hpp>
 #include <fc/crypto/ripemd160.hpp>
-#include <fc/crypto/hash160.hpp>
 #include <fc/crypto/sha1.hpp>
 #include <fc/crypto/sha224.hpp>
 #include <fc/crypto/sha256.hpp>
@@ -18,6 +17,7 @@ static const std::string TEST3("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmno
 static const std::string TEST4("abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu");
 static char TEST5[1000001];
 static const std::string TEST6("abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmno");
+static const std::string TEST7("double(int)");
 
 static void init_5() {
     memset( TEST5, 'a', sizeof(TEST5) - 1 );
@@ -66,8 +66,8 @@ void test_big( const std::string& expected ) {
 
     H hash2( expected );
     fc::variant v;
-    to_variant( hash2, v, 5 );
-    from_variant( v, hash, 5 );
+    to_variant( hash2, v );
+    from_variant( v, hash );
     BOOST_CHECK( hash == hash2 );
 
     H hash3( expected.substr(15) + "000000000000000" );
@@ -76,7 +76,7 @@ void test_big( const std::string& expected ) {
 
 template<typename H>
 void test_stream( ) {
-    H hash = H::hash( TEST1 );
+    H hash( TEST1 );
     std::stringstream stream;
     stream << hash;
 
@@ -109,18 +109,6 @@ BOOST_AUTO_TEST_CASE(ripemd160_test)
     test_stream<fc::ripemd160>();
 }
 
-BOOST_AUTO_TEST_CASE( hash160_test )
-{
-   
-   test<fc::hash160>( TEST1, "bb1be98c142444d7a56aa3981c3942a978e4dc33" );
-   test<fc::hash160>( TEST2, "b472a266d0bd89c13706a4132ccfb16f7c3b9fcb" );
-   test<fc::hash160>( TEST3, "69dda8a60e0cfc2353aa776864092c0e5ccb4834" );
-   test<fc::hash160>( TEST4, "dfcc6db6ea54d85d2e3a76573183f7a037a729b0" );
-   init_5();
-   test<fc::hash160>( TEST5, "f9be0e104ef2ed83a7ddb4765780951405e56ba4" ); 
-   test<fc::hash160>( TEST6, "3eca00d3b1fcafb0b74fa07fe890bea9b053a17e" );
-}
-
 BOOST_AUTO_TEST_CASE(sha1_test)
 {
     init_5();
@@ -151,6 +139,7 @@ BOOST_AUTO_TEST_CASE(sha256_test)
     test<fc::sha256>( TEST3, "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1" );
     test<fc::sha256>( TEST4, "cf5b16a778af8380036ce59e7b0492370b249b11e8f07a51afac45037afee9d1" );
     test<fc::sha256>( TEST5, "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0" );
+    test<fc::sha256>( TEST7, "6740d36c7d42fba12b8eb3b047193c9761224c267d7a2e96dc50949860652317" );
     test_big<fc::sha256>( "50e72a0e26442fe2552dc3938ac58658228c0cbfb1d2ca872ae435266fcd055e" );
     test_stream<fc::sha256>();
 

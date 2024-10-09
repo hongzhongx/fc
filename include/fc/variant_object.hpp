@@ -1,9 +1,11 @@
 #pragma once
 #include <fc/variant.hpp>
-#include <memory>
+#include <fc/shared_ptr.hpp>
+#include <fc/unique_ptr.hpp>
 
 namespace fc
 {
+   using std::map;
    class mutable_variant_object;
    
    /**
@@ -65,12 +67,21 @@ namespace fc
 
       /** initializes the first key/value pair in the object */
       variant_object( string key, variant val );
+
+      template<typename T>
+      variant_object( const map<string,T>& values )
+      :_key_value( new std::vector<entry>() ) {
+         _key_value->reserve( values.size() );
+         for( const auto& item : values ) {
+            _key_value->emplace_back( entry( item.first, fc::variant(item.second) ) );
+         }
+      }
        
       template<typename T>
       variant_object( string key, T&& val )
       :_key_value( std::make_shared<std::vector<entry> >() )
       {
-         *this = variant_object( std::move(key), variant(std::forward<T>(val)) );
+         *this = variant_object( std::move(key), variant(forward<T>(val)) );
       }
       variant_object( const variant_object& );
       variant_object( variant_object&& );
@@ -89,9 +100,9 @@ namespace fc
       friend class mutable_variant_object;
    };
    /** @ingroup Serializable */
-   void to_variant( const variant_object& var, variant& vo, uint32_t max_depth = 1 );
+   void to_variant( const variant_object& var,  variant& vo );
    /** @ingroup Serializable */
-   void from_variant( const variant& var, variant_object& vo, uint32_t max_depth = 1 );
+   void from_variant( const variant& var,  variant_object& vo );
 
 
   /**
@@ -168,12 +179,11 @@ namespace fc
       *
       *  @return *this;
       */
-      mutable_variant_object& operator()( string key, variant var, uint32_t max_depth = 1 );
+      mutable_variant_object& operator()( string key, variant var );
       template<typename T>
-      mutable_variant_object& operator()( string key, T&& var, uint32_t max_depth )
+      mutable_variant_object& operator()( string key, T&& var )
       {
-         _FC_ASSERT( max_depth > 0, "Recursion depth exceeded!" );
-         set( std::move(key), variant( std::forward<T>(var), max_depth - 1 ) );
+         set(std::move(key), variant( fc::forward<T>(var) ) );
          return *this;
       }
       /**
@@ -191,10 +201,19 @@ namespace fc
       explicit mutable_variant_object( T&& v )
       :_key_value( new std::vector<entry>() )
       {
-          *this = variant(std::forward<T>(v)).get_object();
+          *this = variant(fc::forward<T>(v)).get_object();
       }
 
       mutable_variant_object();
+
+      template<typename T>
+      mutable_variant_object( const map<string,T>& values )
+      :_key_value( new std::vector<entry>() ) {
+         _key_value->reserve( values.size() );
+         for( const auto& item : values ) {
+            _key_value->emplace_back( variant_object::entry( item.first, fc::variant(item.second) ) );
+         }
+      }
 
       /** initializes the first key/value pair in the object */
       mutable_variant_object( string key, variant val );
@@ -202,7 +221,7 @@ namespace fc
       mutable_variant_object( string key, T&& val )
       :_key_value( new std::vector<entry>() )
       {
-         set( std::move(key), variant(std::forward<T>(val)) );
+         set( std::move(key), variant(fc::forward<T>(val)) );
       }
 
       mutable_variant_object( mutable_variant_object&& );
@@ -212,48 +231,30 @@ namespace fc
       mutable_variant_object& operator=( mutable_variant_object&& );
       mutable_variant_object& operator=( const mutable_variant_object& );
       mutable_variant_object& operator=( const variant_object& );
+
+
    private:
       std::unique_ptr< std::vector< entry > > _key_value;
       friend class variant_object;
    };
+   /** @ingroup Serializable */
+   void to_variant( const mutable_variant_object& var,  variant& vo );
+   /** @ingroup Serializable */
+   void from_variant( const variant& var,  mutable_variant_object& vo );
 
-   class limited_mutable_variant_object : public mutable_variant_object
+   template<typename T>
+   void to_variant( const std::map<string, T>& var,  variant& vo )
    {
-      public:
-         limited_mutable_variant_object( uint32_t max_depth, bool skip_on_exception = false );
+       vo = variant_object( var );
+   }
 
-         template<typename T>
-         limited_mutable_variant_object& operator()( string key, T&& var )
-         {
-            if( _reached_depth_limit )
-               // _skip_on_exception will always be true here
-               return *this;
-
-            optional<variant> v;
-            try
-            {
-               v = variant( std::forward<T>(var), _max_depth );
-            }
-            catch( ... )
-            {
-               if( !_skip_on_exception )
-                  throw;
-               v = variant( "[ERROR: Caught exception while converting data to variant]" );
-            }
-            set( std::move(key), *v );
-            return *this;
-         }
-         limited_mutable_variant_object& operator()( const variant_object& vo );
-
-      private:
-         const uint32_t _max_depth;       ///< The depth limit
-         const bool _reached_depth_limit; ///< Indicates whether we've reached depth limit
-         const bool _skip_on_exception;   ///< If set to true, won't rethrow exceptions when reached depth limit
-   };
-
-   /** @ingroup Serializable */
-   void to_variant( const mutable_variant_object& var, variant& vo, uint32_t max_depth = 1 );
-   /** @ingroup Serializable */
-   void from_variant( const variant& var, mutable_variant_object& vo, uint32_t max_depth = 1 );
+   template<typename T>
+   void from_variant( const variant& var,  std::map<string, T>& vo )
+   {
+      const auto& obj = var.get_object();
+      vo.clear();
+      for( auto itr = obj.begin(); itr != obj.end(); ++itr )
+         vo[itr->key()] = itr->value().as<T>();
+   }
 
 } // namespace fc

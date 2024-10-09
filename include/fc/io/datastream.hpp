@@ -1,4 +1,5 @@
 #pragma once
+#include <fc/utility.hpp>
 #include <string.h>
 #include <stdint.h>
 
@@ -6,7 +7,7 @@ namespace fc {
 
 namespace detail 
 {
-  [[noreturn]] void throw_datastream_range_error( const char* file, size_t len, int64_t over );
+  NO_RETURN void throw_datastream_range_error( const char* file, size_t len, int64_t over );
 }
 
 /**
@@ -87,6 +88,95 @@ class datastream<size_t> {
   private:
      size_t _size;
 };
+
+template<typename ST>
+inline datastream<ST>& operator<<(datastream<ST>& ds, const int32_t& d) {
+  ds.write( (const char*)&d, sizeof(d) );
+  return ds;
+}
+template<typename ST, typename DATA>
+inline datastream<ST>& operator>>(datastream<ST>& ds, int32_t& d) {
+  ds.read((char*)&d, sizeof(d) );
+  return ds;
+}
+template<typename ST>
+inline datastream<ST>& operator<<(datastream<ST>& ds, const uint32_t& d) {
+  ds.write( (const char*)&d, sizeof(d) );
+  return ds;
+}
+
+template<typename ST, typename DATA>
+inline datastream<ST>& operator>>(datastream<ST>& ds, uint32_t& d) {
+  ds.read((char*)&d, sizeof(d) );
+  return ds;
+}
+template<typename ST>
+inline datastream<ST>& operator<<(datastream<ST>& ds, const int64_t& d) {
+  ds.write( (const char*)&d, sizeof(d) );
+  return ds;
+}
+
+template<typename ST, typename DATA>
+inline datastream<ST>& operator>>(datastream<ST>& ds, int64_t& d) {
+  ds.read((char*)&d, sizeof(d) );
+  return ds;
+}
+template<typename ST>
+inline datastream<ST>& operator<<(datastream<ST>& ds, const uint64_t& d) {
+  ds.write( (const char*)&d, sizeof(d) );
+  return ds;
+}
+
+template<typename ST, typename DATA>
+inline datastream<ST>& operator>>(datastream<ST>& ds, uint64_t& d) {
+  ds.read((char*)&d, sizeof(d) );
+  return ds;
+}
+template<typename ST>
+inline datastream<ST>& operator<<(datastream<ST>& ds, const int16_t& d) {
+  ds.write( (const char*)&d, sizeof(d) );
+  return ds;
+}
+
+template<typename ST, typename DATA>
+inline datastream<ST>& operator>>(datastream<ST>& ds, int16_t& d) {
+  ds.read((char*)&d, sizeof(d) );
+  return ds;
+}
+template<typename ST>
+inline datastream<ST>& operator<<(datastream<ST>& ds, const uint16_t& d) {
+  ds.write( (const char*)&d, sizeof(d) );
+  return ds;
+}
+
+template<typename ST, typename DATA>
+inline datastream<ST>& operator>>(datastream<ST>& ds, uint16_t& d) {
+  ds.read((char*)&d, sizeof(d) );
+  return ds;
+}
+template<typename ST>
+inline datastream<ST>& operator<<(datastream<ST>& ds, const int8_t& d) {
+  ds.write( (const char*)&d, sizeof(d) );
+  return ds;
+}
+
+template<typename ST, typename DATA>
+inline datastream<ST>& operator>>(datastream<ST>& ds, int8_t& d) {
+  ds.read((char*)&d, sizeof(d) );
+  return ds;
+}
+template<typename ST>
+inline datastream<ST>& operator<<(datastream<ST>& ds, const uint8_t& d) {
+  ds.write( (const char*)&d, sizeof(d) );
+  return ds;
+}
+
+template<typename ST, typename DATA>
+inline datastream<ST>& operator>>(datastream<ST>& ds, uint8_t& d) {
+  ds.read((char*)&d, sizeof(d) );
+  return ds;
+}
+
 
 } // namespace fc
 

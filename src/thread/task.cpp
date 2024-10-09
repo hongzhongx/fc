@@ -22,8 +22,7 @@ namespace fc {
   _next(nullptr),
   _task_specific_data(nullptr),
   _promise_impl(nullptr),
-  _functor(func),
-  _retain_count(0){
+  _functor(func){
   }
 
   void task_base::run() {
@@ -102,12 +101,4 @@ namespace fc {
     }
   }
 
-  void task_base::retain() {
-    if( _retain_count.fetch_add(1, boost::memory_order_relaxed) == 0 )
-      _self = shared_from_this();
-  }
-  void task_base::release() {
-    if( _retain_count.fetch_sub(1, boost::memory_order_release) == 1 )
-      _self.reset();
-  }
 }

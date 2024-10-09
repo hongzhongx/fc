@@ -13,7 +13,7 @@ namespace fc
        {
           public:
              buffered_istream_impl( istream_ptr is ) :
-               _istr(std::move(is))
+               _istr(fc::move(is))
 #ifndef NDEBUG
                ,_shared_read_buffer_in_use(false)
 #endif
@@ -30,17 +30,17 @@ namespace fc
     }
 
     buffered_istream::buffered_istream( istream_ptr is )
-    :my( new detail::buffered_istream_impl( std::move(is) ) )
+    :my( new detail::buffered_istream_impl( fc::move(is) ) )
     {
        FC_ASSERT( my->_istr != nullptr, " this shouldn't be null" );
     }
 
     buffered_istream::buffered_istream( buffered_istream&& o )
-    :my( std::move(o.my) ){}
+    :my( fc::move(o.my) ){}
 
     buffered_istream& buffered_istream::operator=( buffered_istream&& i )
     {
-       my = std::move(i.my);
+       my = fc::move(i.my);
        return *this;
     }
 
@@ -135,7 +135,7 @@ namespace fc
        {
           public:
              buffered_ostream_impl( ostream_ptr os ) :
-               _ostr(std::move(os))
+               _ostr(fc::move(os))
 #ifndef NDEBUG
                ,_shared_write_buffer_in_use(false)
 #endif
@@ -151,16 +151,16 @@ namespace fc
     }
 
     buffered_ostream::buffered_ostream( ostream_ptr os, size_t bufsize )
-    :my( new detail::buffered_ostream_impl( std::move(os) ) )
+    :my( new detail::buffered_ostream_impl( fc::move(os) ) )
     {
     }
 
     buffered_ostream::buffered_ostream( buffered_ostream&& o )
-    :my( std::move(o.my) ){}
+    :my( fc::move(o.my) ){}
 
     buffered_ostream& buffered_ostream::operator=( buffered_ostream&& i )
     {
-       my = std::move(i.my);
+       my = fc::move(i.my);
        return *this;
     }
 

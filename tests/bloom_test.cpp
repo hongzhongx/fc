@@ -48,7 +48,7 @@ BOOST_AUTO_TEST_CASE(bloom_test_1)
       std::string line;
       std::ifstream in("README.md");
       std::ofstream words("words.txt");
-      while( in.good() && count < 100000 )
+      while( !in.eof() && count < 100000 )
       {
          std::getline(in, line);
 //         std::cout << "'"<<line<<"'\n";
@@ -59,7 +59,15 @@ BOOST_AUTO_TEST_CASE(bloom_test_1)
             ++count;
          }
       }
-      // FIXME: this doesn't really test anything.
+//      wdump((filter));
+      auto packed_filter = fc::raw::pack_to_vector(filter);
+//      wdump((packed_filter.size()));
+//      wdump((packed_filter));
+      std::stringstream out;
+//      std::string str = fc::json::to_string(packed_filter);
+      auto b64 = fc::base64_encode( packed_filter.data(), packed_filter.size() );
+      for( uint32_t i = 0; i < b64.size(); i += 1024 )
+         out << '"' <<  b64.substr( i, 1024 ) << "\",\n";
    }
    catch ( const fc::exception& e )
    {

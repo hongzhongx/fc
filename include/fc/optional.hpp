@@ -1,6 +1,7 @@
 #pragma once
+#include <fc/utility.hpp>
 #include <assert.h>
-#include <utility>
+
 
 namespace fc {
 #ifdef _MSC_VER
@@ -42,7 +43,7 @@ namespace fc {
       optional( optional&& o )
       :_valid(false) 
       {
-        if( o._valid ) new (ptr()) T( std::move(*o) );
+        if( o._valid ) new (ptr()) T( fc::move(*o) );
         _valid = o._valid;
         o.reset();
       }
@@ -70,7 +71,7 @@ namespace fc {
       optional( optional<U>&& o )
       :_valid(false) 
       {
-        if( o._valid ) new (ptr()) T( std::move(*o) );
+        if( o._valid ) new (ptr()) T( fc::move(*o) );
         _valid = o._valid;
         o.reset();
       }
@@ -79,14 +80,14 @@ namespace fc {
       optional( U&& u )
       :_valid(true) 
       {
-        new ((char*)ptr()) T( std::forward<U>(u) );
+        new ((char*)ptr()) T( fc::forward<U>(u) );
       }
 
       template<typename U>
       optional& operator=( U&& u ) 
       {
         reset();
-        new (ptr()) T( std::forward<U>(u) );
+        new (ptr()) T( fc::forward<U>(u) );
         _valid = true;
         return *this;
       }
@@ -155,10 +156,10 @@ namespace fc {
         {
           if( _valid && o._valid ) 
           {
-            ref() = std::move(*o);
+            ref() = fc::move(*o);
             o.reset();
           } else if ( !_valid && o._valid ) {
-            *this = std::move(*o);
+            *this = fc::move(*o);
           } else if (_valid) {
             reset();
           }
@@ -172,10 +173,10 @@ namespace fc {
         {
           if( _valid && o._valid ) 
           {
-            ref() = std::move(*o);
+            ref() = fc::move(*o);
             o.reset();
           } else if ( !_valid && o._valid ) {
-            *this = std::move(*o);
+            *this = fc::move(*o);
           } else if (_valid) {
             reset();
           }
@@ -236,12 +237,8 @@ namespace fc {
       T*       ptr()      { void* v = &_value[0]; return static_cast<T*>(v); }
       const T* ptr()const { const void* v = &_value[0]; return static_cast<const T*>(v); }
 
-      // force alignment... to 16 byte boundaries
-#if defined(_MSC_VER)
-      double _value[((sizeof(T)+7)/8)] __declspec((align(16)));
-#else
-      double _value[((sizeof(T)+7)/8)] __attribute__((aligned(16)));
-#endif
+      // force alignment... to 8 byte boundaries 
+      double _value[((sizeof(T)+7)/8)];
       bool   _valid;
   };
 

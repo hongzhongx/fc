@@ -1,5 +1,5 @@
 #pragma once
-#include <boost/endian/buffers.hpp>
+
 #include <fc/fwd.hpp>
 #include <fc/io/raw_fwd.hpp>
 #include <fc/reflect/typename.hpp>
@@ -18,7 +18,7 @@ class ripemd160
     explicit operator string()const;
 
     char*    data()const;
-    static constexpr size_t data_size() { return 160/8; }
+    size_t data_size()const { return 160/8; }
 
     static ripemd160 hash( const fc::sha512& h );
     static ripemd160 hash( const fc::sha256& h );
@@ -45,7 +45,7 @@ class ripemd160
         ripemd160 result();
 
       private:
-        class            impl;
+        struct      impl;
         fc::fwd<impl,96> my;
     };
 
@@ -68,26 +68,12 @@ class ripemd160
     friend bool      operator >  ( const ripemd160& h1, const ripemd160& h2 );
     friend bool      operator <  ( const ripemd160& h1, const ripemd160& h2 );
 
-    boost::endian::little_uint32_buf_t _hash[5];
+    uint32_t _hash[5];
 };
 
-namespace raw {
-
-   template<typename T>
-   inline void pack( T& ds, const ripemd160& ep, uint32_t _max_depth ) {
-      ds << ep;
-   }
-
-   template<typename T>
-   inline void unpack( T& ds, ripemd160& ep, uint32_t _max_depth ) {
-      ds >> ep;
-   }
-
-}
-
   class variant;
-  void to_variant( const ripemd160& bi, variant& v, uint32_t max_depth );
-  void from_variant( const variant& v, ripemd160& bi, uint32_t max_depth );
+  void to_variant( const ripemd160& bi, variant& v );
+  void from_variant( const variant& v, ripemd160& bi );
 
   typedef ripemd160 uint160_t;
   typedef ripemd160 uint160;

@@ -87,6 +87,8 @@ BOOST_AUTO_TEST_CASE( test_non_preemptable_assertion )
     ASSERT_TASK_NOT_PREEMPTED();
     {
       ASSERT_TASK_NOT_PREEMPTED();
+      int i = 4;
+      i += 2;
     }
     fc::usleep(fc::seconds(1)); // this should assert
   }
@@ -134,7 +136,7 @@ BOOST_AUTO_TEST_CASE( cancel_a_task_waiting_on_promise )
 {
   enum task_result{task_completed, task_aborted};
 
-  fc::promise<void>::ptr promise_to_wait_on = fc::promise<void>::create();
+  fc::promise<void>::ptr promise_to_wait_on(new fc::promise<void>());
 
   fc::future<task_result> task = fc::async([promise_to_wait_on]() {
     BOOST_TEST_MESSAGE("Starting async task");

@@ -10,14 +10,14 @@
 namespace fc {
 
     sha512::sha512() { memset( _hash, 0, sizeof(_hash) ); }
-    sha512::sha512( const std::string& hex_str ) {
+    sha512::sha512( const string& hex_str ) {
       fc::from_hex( hex_str, (char*)_hash, sizeof(_hash) );  
     }
 
     string sha512::str()const {
       return fc::to_hex( (char*)_hash, sizeof(_hash) );
     }
-    sha512::operator std::string()const { return  str(); }
+    sha512::operator string()const { return  str(); }
 
     char* sha512::data()const { return (char*)&_hash[0]; }
 
@@ -36,7 +36,7 @@ namespace fc {
       e.write(d,dlen);
       return e.result();
     }
-    sha512 sha512::hash( const std::string& s ) {
+    sha512 sha512::hash( const string& s ) {
       return hash( s.c_str(), s.size() );
     }
 
@@ -59,14 +59,14 @@ namespace fc {
     }
     sha512 operator ^ ( const sha512& h1, const sha512& h2 ) {
       sha512 result;
-      result._hash[0] = h1._hash[0].value() ^ h2._hash[0].value();
-      result._hash[1] = h1._hash[1].value() ^ h2._hash[1].value();
-      result._hash[2] = h1._hash[2].value() ^ h2._hash[2].value();
-      result._hash[3] = h1._hash[3].value() ^ h2._hash[3].value();
-      result._hash[4] = h1._hash[4].value() ^ h2._hash[4].value();
-      result._hash[5] = h1._hash[5].value() ^ h2._hash[5].value();
-      result._hash[6] = h1._hash[6].value() ^ h2._hash[6].value();
-      result._hash[7] = h1._hash[7].value() ^ h2._hash[7].value();
+      result._hash[0] = h1._hash[0] ^ h2._hash[0];
+      result._hash[1] = h1._hash[1] ^ h2._hash[1];
+      result._hash[2] = h1._hash[2] ^ h2._hash[2];
+      result._hash[3] = h1._hash[3] ^ h2._hash[3];
+      result._hash[4] = h1._hash[4] ^ h2._hash[4];
+      result._hash[5] = h1._hash[5] ^ h2._hash[5];
+      result._hash[6] = h1._hash[6] ^ h2._hash[6];
+      result._hash[7] = h1._hash[7] ^ h2._hash[7];
       return result;
     }
     bool operator >= ( const sha512& h1, const sha512& h2 ) {
@@ -85,16 +85,19 @@ namespace fc {
       return memcmp( h1._hash, h2._hash, sizeof(h1._hash) ) == 0;
     }
   
-   void to_variant( const sha512& bi, variant& v, uint32_t max_depth )
-   {
-      to_variant( std::vector<char>( (const char*)&bi, ((const char*)&bi) + sizeof(bi) ), v, max_depth );
-   }
-   void from_variant( const variant& v, sha512& bi, uint32_t max_depth )
-   {
-      std::vector<char> ve = v.as< std::vector<char> >( max_depth );
-      memset( &bi, char(0), sizeof(bi) );
-      if( ve.size() )
-         memcpy( &bi, ve.data(), std::min<size_t>(ve.size(),sizeof(bi)) );
+  void to_variant( const sha512& bi, variant& v )
+  {
+     v = std::vector<char>( (const char*)&bi, ((const char*)&bi) + sizeof(bi) );
+  }
+  void from_variant( const variant& v, sha512& bi )
+  {
+    std::vector<char> ve = v.as< std::vector<char> >();
+    if( ve.size() )
+    {
+        memcpy(&bi, ve.data(), fc::min<size_t>(ve.size(),sizeof(bi)) );
+    }
+    else
+        memset( static_cast<void*>(&bi), char(0), sizeof(bi) );
   }
 
     template<>

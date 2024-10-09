@@ -1,10 +1,10 @@
 #pragma once
 
-#include <string>
+#include <fc/string.hpp>
 
 namespace fc 
 {
 
-std::string zlib_compress(const std::string& in);
+  string zlib_compress(const string& in);
 
 } // namespace fc

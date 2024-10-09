@@ -11,14 +11,14 @@ namespace fc
 {
   
 sha1::sha1() { memset( _hash, 0, sizeof(_hash) ); }
-sha1::sha1( const std::string& hex_str ) {
+sha1::sha1( const string& hex_str ) {
   fc::from_hex( hex_str, (char*)_hash, sizeof(_hash) );  
 }
 
 string sha1::str()const {
   return fc::to_hex( (char*)_hash, sizeof(_hash) );
 }
-sha1::operator std::string()const { return  str(); }
+sha1::operator string()const { return  str(); }
 
 char* sha1::data()const { return (char*)&_hash[0]; }
 
@@ -37,7 +37,7 @@ sha1 sha1::hash( const char* d, uint32_t dlen ) {
   e.write(d,dlen);
   return e.result();
 }
-sha1 sha1::hash( const std::string& s ) {
+sha1 sha1::hash( const string& s ) {
   return hash( s.c_str(), s.size() );
 }
 
@@ -60,11 +60,11 @@ sha1 operator << ( const sha1& h1, uint32_t i ) {
 }
 sha1 operator ^ ( const sha1& h1, const sha1& h2 ) {
   sha1 result;
-  result._hash[0] = h1._hash[0].value() ^ h2._hash[0].value();
-  result._hash[1] = h1._hash[1].value() ^ h2._hash[1].value();
-  result._hash[2] = h1._hash[2].value() ^ h2._hash[2].value();
-  result._hash[3] = h1._hash[3].value() ^ h2._hash[3].value();
-  result._hash[4] = h1._hash[4].value() ^ h2._hash[4].value();
+  result._hash[0] = h1._hash[0] ^ h2._hash[0];
+  result._hash[1] = h1._hash[1] ^ h2._hash[1];
+  result._hash[2] = h1._hash[2] ^ h2._hash[2];
+  result._hash[3] = h1._hash[3] ^ h2._hash[3];
+  result._hash[4] = h1._hash[4] ^ h2._hash[4];
   return result;
 }
 bool operator >= ( const sha1& h1, const sha1& h2 ) {
@@ -83,16 +83,19 @@ bool operator == ( const sha1& h1, const sha1& h2 ) {
   return memcmp( h1._hash, h2._hash, sizeof(h1._hash) ) == 0;
 }
   
-  void to_variant( const sha1& bi, variant& v, uint32_t max_depth )
+  void to_variant( const sha1& bi, variant& v )
   {
-     to_variant( std::vector<char>( (const char*)&bi, ((const char*)&bi) + sizeof(bi) ), v, max_depth );
+     v = std::vector<char>( (const char*)&bi, ((const char*)&bi) + sizeof(bi) );
   }
-  void from_variant( const variant& v, sha1& bi, uint32_t max_depth )
+  void from_variant( const variant& v, sha1& bi )
   {
-    std::vector<char> ve = v.as< std::vector<char> >( max_depth );
-    memset( &bi, char(0), sizeof(bi) );
+    std::vector<char> ve = v.as< std::vector<char> >();
     if( ve.size() )
-       memcpy( &bi, ve.data(), std::min<size_t>(ve.size(),sizeof(bi)) );
+    {
+        memcpy(&bi, ve.data(), fc::min<size_t>(ve.size(),sizeof(bi)) );
+    }
+    else
+        memset( static_cast<void*>(&bi), char(0), sizeof(bi) );
   }
   
 } // fc

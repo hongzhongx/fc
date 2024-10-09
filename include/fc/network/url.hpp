@@ -1,4 +1,5 @@
 #pragma once
+#include <fc/string.hpp>
 #include <fc/optional.hpp>
 #include <stdint.h>
 #include <fc/filesystem.hpp>
@@ -7,7 +8,7 @@
 
 namespace fc {
 
-  typedef fc::optional<std::string>           ostring;
+  typedef fc::optional<fc::string>           ostring;
   typedef fc::optional<fc::path>             opath;
   typedef fc::optional<fc::variant_object>   ovariant_object;
 
@@ -54,8 +55,8 @@ namespace fc {
       std::shared_ptr<detail::url_impl> my;
   };
 
-  void to_variant( const url& u, fc::variant& v, uint32_t max_depth = 1 );
-  void from_variant( const fc::variant& v, url& u, uint32_t max_depth = 1 );
+  void to_variant( const url& u, fc::variant& v );
+  void from_variant( const fc::variant& v, url& u );
 
   /**
    *  Used to create / manipulate a URL

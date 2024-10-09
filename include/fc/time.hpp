@@ -1,6 +1,6 @@
 #pragma once
 #include <stdint.h>
-#include <string>
+#include <fc/string.hpp>
 #include <fc/optional.hpp>
 
 #ifdef _MSC_VER
@@ -38,8 +38,8 @@ namespace fc {
   inline microseconds days(int64_t d) { return hours(24*d); }
 
   class variant;
-  void to_variant( const fc::microseconds&,  fc::variant&, uint32_t max_depth = 1  );
-  void from_variant( const fc::variant&, fc::microseconds&, uint32_t max_depth = 1 );
+  void to_variant( const fc::microseconds&,  fc::variant&  );
+  void from_variant( const fc::variant& , fc::microseconds& );
 
   class time_point {
     public:
@@ -48,8 +48,8 @@ namespace fc {
         static time_point maximum() { return time_point( microseconds::maximum() ); }
         static time_point min() { return time_point();                      }
 
-        operator std::string()const;
-        static time_point from_iso_string( const std::string& s );
+        operator fc::string()const;
+        static time_point from_iso_string( const fc::string& s );
 
         const microseconds& time_since_epoch()const { return elapsed; }
         uint32_t            sec_since_epoch()const  { return elapsed.count() / 1000000; }
@@ -112,11 +112,11 @@ namespace fc {
         friend microseconds operator - ( const time_point_sec& t, const time_point_sec& m ) { return time_point(t) - time_point(m); }
         friend microseconds operator - ( const time_point& t, const time_point_sec& m ) { return time_point(t) - time_point(m); }
 
-        std::string to_non_delimited_iso_string()const;
-        std::string to_iso_string()const;
+        fc::string to_non_delimited_iso_string()const;
+        fc::string to_iso_string()const;
 
-        operator std::string()const;
-        static time_point_sec from_iso_string( const std::string& s );
+        operator fc::string()const;
+        static time_point_sec from_iso_string( const fc::string& s );
 
     private:
         uint32_t utc_seconds;
@@ -127,12 +127,12 @@ namespace fc {
   /** return a human-readable approximate time, relative to now()
    * e.g., "4 hours ago", "2 months ago", etc.
    */
-  std::string get_approximate_relative_time_string(const time_point_sec& event_time,
-                                                   const time_point_sec& relative_to_time = fc::time_point::now(),
-                                                   const std::string& ago = " ago");
-  std::string get_approximate_relative_time_string(const time_point& event_time,
-                                                   const time_point& relative_to_time = fc::time_point::now(),
-                                                   const std::string& ago = " ago");
+  string get_approximate_relative_time_string(const time_point_sec& event_time,
+                                              const time_point_sec& relative_to_time = fc::time_point::now(),
+                                              const std::string& ago = " ago");
+  string get_approximate_relative_time_string(const time_point& event_time,
+                                              const time_point& relative_to_time = fc::time_point::now(),
+                                              const std::string& ago = " ago");
 }
 
 #include <fc/reflect/reflect.hpp>

@@ -1,7 +1,7 @@
 #pragma once
 #include <stdint.h>
-#include <string>
-#include <vector>
+#include <fc/string.hpp>
+#include <fc/vector.hpp>
 
 struct bignum_st;
 typedef bignum_st BIGNUM;
@@ -55,7 +55,7 @@ namespace fc {
       bigint operator--(int);
       bigint& operator--();
 
-      operator std::string()const;
+      operator fc::string()const;
 
       // returns bignum as bigendian bytes
       operator std::vector<char>()const;
@@ -69,8 +69,8 @@ namespace fc {
 
   class variant;
   /** encodes the big int as base64 string, or a number */
-  void to_variant( const bigint& bi, variant& v, uint32_t max_depth = 1 );
+  void to_variant( const bigint& bi, variant& v );
   /** decodes the big int as base64 string, or a number */
-  void from_variant( const variant& v, bigint& bi, uint32_t max_depth = 1 );
+  void from_variant( const variant& v, bigint& bi );
 } // namespace fc
 

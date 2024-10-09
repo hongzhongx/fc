@@ -9,8 +9,8 @@ namespace fc
    // entry
 
    variant_object::entry::entry() {}
-   variant_object::entry::entry( string k, variant v ) : _key(std::move(k)),_value(std::move(v)) {}
-   variant_object::entry::entry( entry&& e ) : _key(std::move(e._key)),_value(std::move(e._value)) {}
+   variant_object::entry::entry( string k, variant v ) : _key(fc::move(k)),_value(fc::move(v)) {}
+   variant_object::entry::entry( entry&& e ) : _key(fc::move(e._key)),_value(fc::move(e._value)) {}
    variant_object::entry::entry( const entry& e ) : _key(e._key),_value(e._value) {}
    variant_object::entry& variant_object::entry::operator=( const variant_object::entry& e )
    {
@@ -23,8 +23,8 @@ namespace fc
    }
    variant_object::entry& variant_object::entry::operator=( variant_object::entry&& e )
    {
-      std::swap( _key, e._key );
-      std::swap( _value, e._value );
+      fc_swap( _key, e._key );
+      fc_swap( _value, e._value );
       return *this;
    }
    
@@ -44,7 +44,7 @@ namespace fc
 
    void  variant_object::entry::set( variant v )
    {
-      std::swap( _value, v );
+      fc_swap( _value, v );
    }
 
    // ---------------------------------------------------------------
@@ -103,7 +103,8 @@ namespace fc
    variant_object::variant_object( string key, variant val )
       : _key_value(std::make_shared<std::vector<entry>>())
    {
-       _key_value->emplace_back(entry(std::move(key), std::move(val)));
+       //_key_value->push_back(entry(fc::move(key), fc::move(val)));
+       _key_value->emplace_back(entry(fc::move(key), fc::move(val)));
    }
 
    variant_object::variant_object( const variant_object& obj )
@@ -113,7 +114,7 @@ namespace fc
    }
 
    variant_object::variant_object( variant_object&& obj)
-   : _key_value( std::move(obj._key_value) )
+   : _key_value( fc::move(obj._key_value) )
    {
       obj._key_value = std::make_shared<std::vector<entry>>();
       assert( _key_value != nullptr );
@@ -125,7 +126,7 @@ namespace fc
    }
 
    variant_object::variant_object( mutable_variant_object&& obj )
-   : _key_value(std::move(obj._key_value))
+   : _key_value(fc::move(obj._key_value))
    {
       assert( _key_value != nullptr );
    }
@@ -134,7 +135,7 @@ namespace fc
    {
       if (this != &obj)
       {
-         std::swap(_key_value, obj._key_value );
+         fc_swap(_key_value, obj._key_value );
          assert( _key_value != nullptr );
       }
       return *this;
@@ -151,7 +152,7 @@ namespace fc
 
    variant_object& variant_object::operator=( mutable_variant_object&& obj )
    {
-      _key_value = std::move(obj._key_value);
+      _key_value = fc::move(obj._key_value);
       obj._key_value.reset( new std::vector<entry>() );
       return *this;
    }
@@ -162,12 +163,13 @@ namespace fc
       return *this;
    }
 
-   void to_variant( const variant_object& var, variant& vo, uint32_t max_depth )
+
+   void to_variant( const variant_object& var,  variant& vo )
    {
       vo = variant(var);
    }
 
-   void from_variant( const variant& var, variant_object& vo, uint32_t max_depth )
+   void from_variant( const variant& var,  variant_object& vo )
    {
       vo = var.get_object();
    }
@@ -266,7 +268,7 @@ namespace fc
    mutable_variant_object::mutable_variant_object( string key, variant val )
       : _key_value(new std::vector<entry>())
    {
-       _key_value->push_back(entry(std::move(key), std::move(val)));
+       _key_value->push_back(entry(fc::move(key), fc::move(val)));
    }
 
    mutable_variant_object::mutable_variant_object( const variant_object& obj )
@@ -280,7 +282,7 @@ namespace fc
    }
 
    mutable_variant_object::mutable_variant_object( mutable_variant_object&& obj )
-      : _key_value(std::move(obj._key_value))
+      : _key_value(fc::move(obj._key_value))
    {
    }
 
@@ -294,7 +296,7 @@ namespace fc
    {
       if (this != &obj)
       {
-         _key_value = std::move(obj._key_value);
+         _key_value = fc::move(obj._key_value);
       }
       return *this;
    }
@@ -331,11 +333,11 @@ namespace fc
       auto itr = find( key.c_str() );
       if( itr != end() )
       {
-         itr->set( std::move(var) );
+         itr->set( fc::move(var) );
       }
       else
       {
-         _key_value->push_back( entry( std::move(key), std::move(var) ) );
+         _key_value->push_back( entry( fc::move(key), fc::move(var) ) );
       }
       return *this;
    }
@@ -343,9 +345,9 @@ namespace fc
    /** Appends \a key and \a var without checking for duplicates, designed to
     *  simplify construction of dictionaries using (key,val)(key2,val2) syntax 
     */
-   mutable_variant_object& mutable_variant_object::operator()( string key, variant var, uint32_t max_depth )
+   mutable_variant_object& mutable_variant_object::operator()( string key, variant var )
    {
-      _key_value->push_back( entry( std::move(key), std::move(var) ) );
+      _key_value->push_back( entry( fc::move(key), fc::move(var) ) );
       return *this;
    }
 
@@ -365,44 +367,12 @@ namespace fc
       return *this;
    }
 
-   limited_mutable_variant_object::limited_mutable_variant_object( uint32_t m, bool skip_on_exception )
-         : mutable_variant_object(),
-           _max_depth(m - 1),
-           _reached_depth_limit(m == 0),
-           _skip_on_exception(skip_on_exception)
-   {
-      if( !skip_on_exception )
-         FC_ASSERT( m > 0, "Recursion depth exceeded!" );
-      else if( m == 0 )
-         set( "__err_msg", "[ERROR: Recusion depth exceeded!]" );
-   }
-
-   limited_mutable_variant_object& limited_mutable_variant_object::operator()( const variant_object& vo )
-   {
-      if( _reached_depth_limit )
-         // _skip_on_exception will always be true here
-         return *this;
-
-      try
-      {
-         mutable_variant_object::operator()( vo );
-      }
-      catch( ... )
-      {
-         if( !_skip_on_exception )
-            throw;
-         else
-            set( "__err_msg", "[ERROR: Caught exception in operator()( const variant_object& ).]" );
-      }
-      return *this;
-   }
-
-   void to_variant( const mutable_variant_object& var, variant& vo, uint32_t max_depth )
+   void to_variant( const mutable_variant_object& var,  variant& vo )
    {
       vo = variant(var);
    }
 
-   void from_variant( const variant& var, mutable_variant_object& vo, uint32_t max_depth )
+   void from_variant( const variant& var,  mutable_variant_object& vo )
    {
       vo = var.get_object();
    }
