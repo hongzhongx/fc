@@ -209,7 +209,7 @@ if( NOT( Boost_VERSION LESS 106900 ) )
   SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden")
 endif()
 
-IF($ENV{OPENSSL_ROOT_DIR})
+IF(NOT "$ENV{OPENSSL_ROOT_DIR}" STREQUAL "")
   set(OPENSSL_ROOT_DIR $ENV{OPENSSL_ROOT_DIR} )
   set(OPENSSL_INCLUDE_DIR ${OPENSSL_ROOT_DIR}/include)
   message(STATUS "Setting up OpenSSL root and include vars to ${OPENSSL_ROOT_DIR}, ${OPENSSL_INCLUDE_DIR}")
