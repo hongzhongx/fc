@@ -74,7 +74,7 @@ namespace fc
         log_level     get_log_level()const;
         string        get_context()const;
 
-        void          append_context( const fc::string& c );
+        void          append_context( const std::string& c );
 
         string        to_string()const;
       private:

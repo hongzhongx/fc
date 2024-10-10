@@ -208,7 +208,7 @@ namespace fc
        return std::make_shared<exception>(*this);
    }
 
-   fc::string except_str()
+   std::string except_str()
    {
        return boost::current_exception_diagnostic_information();
    }

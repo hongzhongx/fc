@@ -181,12 +181,12 @@ namespace fc {
       }
 
       line << "] ";
-      fc::string message = fc::format_string( m.get_format(), m.get_data() );
+      std::string message = fc::format_string( m.get_format(), m.get_data() );
       line << message.c_str();
 
       //fc::variant lmsg(m);
 
-      // fc::string fmt_str = fc::format_string( my->cfg.format, mutable_variant_object(m.get_context())( "message", message)  );
+      // std::string fmt_str = fc::format_string( my->cfg.format, mutable_variant_object(m.get_context())( "message", message)  );
 
       {
         fc::scoped_lock<boost::mutex> lock( my->slock );

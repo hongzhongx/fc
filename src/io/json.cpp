@@ -17,9 +17,9 @@ namespace fc
     // forward declarations of provided functions
     template<typename T, json::parse_type parser_type> variant variant_from_stream( T& in, uint32_t depth = 0 );
     template<typename T> char parseEscape( T& in, uint32_t depth = 0 );
-    template<typename T> fc::string stringFromStream( T& in, uint32_t depth = 0 );
+    template<typename T> std::string stringFromStream( T& in, uint32_t depth = 0 );
     template<typename T> bool skip_white_space( T& in, uint32_t depth = 0 );
-    template<typename T> fc::string stringFromToken( T& in, uint32_t depth = 0 );
+    template<typename T> std::string stringFromToken( T& in, uint32_t depth = 0 );
     template<typename T, json::parse_type parser_type> variant_object objectFromStream( T& in, uint32_t depth = 0 );
     template<typename T, json::parse_type parser_type> variants arrayFromStream( T& in, uint32_t depth = 0 );
     template<typename T, json::parse_type parser_type> variant number_from_stream( T& in, uint32_t depth = 0 );
@@ -28,7 +28,7 @@ namespace fc
     template<typename T> void to_stream( T& os, const variants& a, json::output_formatting format );
     template<typename T> void to_stream( T& os, const variant_object& o, json::output_formatting format );
     template<typename T> void to_stream( T& os, const variant& v, json::output_formatting format );
-    fc::string pretty_print( const fc::string& v, uint8_t indent );
+    std::string pretty_print( const std::string& v, uint8_t indent );
 }
 
 #include <fc/io/json_relaxed.hpp>
@@ -86,7 +86,7 @@ namespace fc
    }
 
    template<typename T>
-   fc::string stringFromStream( T& in, uint32_t depth )
+   std::string stringFromStream( T& in, uint32_t depth )
    {
       fc::stringstream token;
       try
@@ -123,7 +123,7 @@ namespace fc
                                           ("token", token.str() ) );
    }
    template<typename T>
-   fc::string stringFromToken( T& in, uint32_t depth )
+   std::string stringFromToken( T& in, uint32_t depth )
    {
       fc::stringstream token;
       try
@@ -309,7 +309,7 @@ namespace fc
       catch (const std::ios_base::failure&)
       {
       }
-      fc::string str = ss.str();
+      std::string str = ss.str();
       if (str == "-." || str == ".") // check the obviously wrong things we could have encountered
         FC_THROW_EXCEPTION(parse_error_exception, "Can't parse token \"${token}\" as a JSON numeric constant", ("token", str));
       if( dot )
@@ -362,7 +362,7 @@ namespace fc
 
       // we can get here either by processing a delimiter as in "null,"
       // an EOF like "null<EOF>", or an invalid token like "nullZ"
-      fc::string str = ss.str();
+      std::string str = ss.str();
       if( str == "null" )
         return variant();
       if( str == "true" )
@@ -592,7 +592,7 @@ namespace fc
       }
       os << '"';
    }
-   ostream& json::to_stream( ostream& out, const fc::string& str )
+   ostream& json::to_stream( ostream& out, const std::string& str )
    {
         escape_string( str, out );
         return out;
@@ -691,7 +691,7 @@ namespace fc
       }
    }
 
-   fc::string   json::to_string( const variant& v, output_formatting format /* = stringify_large_ints_and_doubles */ )
+   std::string   json::to_string( const variant& v, output_formatting format /* = stringify_large_ints_and_doubles */ )
    {
       fc::stringstream ss;
       fc::to_stream( ss, v, format );
@@ -699,7 +699,7 @@ namespace fc
    }
 
 
-    fc::string pretty_print( const fc::string& v, uint8_t indent ) {
+    std::string pretty_print( const std::string& v, uint8_t indent ) {
       int level = 0;
       fc::stringstream ss;
       bool first = false;
@@ -789,7 +789,7 @@ namespace fc
 
 
 
-   fc::string json::to_pretty_string( const variant& v, output_formatting format /* = stringify_large_ints_and_doubles */ )
+   std::string json::to_pretty_string( const variant& v, output_formatting format /* = stringify_large_ints_and_doubles */ )
    {
 	   return pretty_print(to_string(v, format), 2);
    }

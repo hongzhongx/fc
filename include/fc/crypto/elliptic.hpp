@@ -169,9 +169,9 @@ namespace fc {
 
             extended_key_data serialize_extended() const;
             static extended_public_key deserialize( const extended_key_data& data );
-            fc::string str() const;
-            fc::string to_base58() const { return str(); }
-            static extended_public_key from_base58( const fc::string& base58 );
+            std::string str() const;
+            std::string to_base58() const { return str(); }
+            static extended_public_key from_base58( const std::string& base58 );
 
             public_key generate_p( int i ) const;
             public_key generate_q( int i ) const;
@@ -195,10 +195,10 @@ namespace fc {
 
             extended_key_data serialize_extended() const;
             static extended_private_key deserialize( const extended_key_data& data );
-            fc::string str() const;
-            fc::string to_base58() const { return str(); }
-            static extended_private_key from_base58( const fc::string& base58 );
-            static extended_private_key generate_master( const fc::string& seed );
+            std::string str() const;
+            std::string to_base58() const { return str(); }
+            static extended_private_key from_base58( const std::string& base58 );
+            static extended_private_key generate_master( const std::string& seed );
             static extended_private_key generate_master( const char* seed, uint32_t seed_len );
 
             // Oleg Andreev's blind signature scheme,

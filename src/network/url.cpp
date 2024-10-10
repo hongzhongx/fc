@@ -12,7 +12,7 @@ namespace fc
     class url_impl
     {
       public:
-         void parse( const fc::string& s )
+         void parse( const std::string& s )
          {
            std::stringstream ss(s);
            std::string skip,_lpath,_largs,luser,lpass;
@@ -20,11 +20,11 @@ namespace fc
            std::getline( ss, skip, '/' );
            std::getline( ss, skip, '/' );
            
-           if( s.find('@') != size_t(fc::string::npos) ) {
-             fc::string user_pass;
+           if( s.find('@') != size_t(std::string::npos) ) {
+             std::string user_pass;
              std::getline( ss, user_pass, '@' );
              std::stringstream upss(user_pass);
-             if( user_pass.find( ':' ) != size_t(fc::string::npos) ) {
+             if( user_pass.find( ':' ) != size_t(std::string::npos) ) {
                 std::getline( upss, luser, ':' );
                 std::getline( upss, lpass, ':' );
                 _user = fc::move(luser);
@@ -33,10 +33,10 @@ namespace fc
                 _user = fc::move(user_pass);
              }
            }
-           fc::string host_port;
+           std::string host_port;
            std::getline( ss, host_port, '/' );
            auto pos = host_port.find( ':' );
-           if( pos != fc::string::npos ) {
+           if( pos != std::string::npos ) {
               try {
               _port = static_cast<uint16_t>(to_uint64( host_port.substr( pos+1 ) ));
               } catch ( ... ) {
@@ -79,7 +79,7 @@ namespace fc
 
   void to_variant( const url& u, fc::variant& v )
   {
-    v = fc::string(u);
+    v = std::string(u);
   }
   void from_variant( const fc::variant& v, url& u )
   {
@@ -104,7 +104,7 @@ namespace fc
       return ss.str();
   }
 
-  url::url( const fc::string& u )
+  url::url( const std::string& u )
   :my( std::make_shared<detail::url_impl>() )
   {
     my->parse(u);

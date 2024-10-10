@@ -223,7 +223,7 @@ namespace fc
         variant( double val );
         variant( bool val );
         variant( blob val );
-        variant( fc::string val );
+        variant( std::string val );
         variant( variant_object );
         variant( mutable_variant_object );
         variant( variants );

@@ -128,7 +128,7 @@ namespace fc {
      return my->name;
    }
 
-   void thread::set_name( const fc::string& n )
+   void thread::set_name( const std::string& n )
    {
      if (!is_current())
      {
@@ -146,7 +146,7 @@ namespace fc {
       return NULL;
    }
 
-   void          thread::debug( const fc::string& d ) { /*my->debug(d);*/ }
+   void          thread::debug( const std::string& d ) { /*my->debug(d);*/ }
 
   void thread::quit(fc::promise<void>* quitDone /*= nullptr*/)
   {

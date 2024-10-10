@@ -39,45 +39,45 @@ namespace fc { namespace rpc  {
           * to call them.
           */
          ///@{ 
-         void add_method( const fc::string& name, method );
-         void add_named_param_method( const fc::string& name, named_param_method );
-         void remove_method( const fc::string& name );
+         void add_method( const std::string& name, method );
+         void add_named_param_method( const std::string& name, named_param_method );
+         void remove_method( const std::string& name );
          //@}
 
          /**
           * @name client interface
           */
          ///@{
-         void notice( const fc::string& method );
-         void notice( const fc::string& method, const variants& args );
-         void notice( const fc::string& method, const variant_object& named_args );
+         void notice( const std::string& method );
+         void notice( const std::string& method, const variants& args );
+         void notice( const std::string& method, const variant_object& named_args );
 
          /// args will be handled as named params
-         future<variant> async_call( const fc::string& method, 
+         future<variant> async_call( const std::string& method, 
                                      const variant_object& args );
 
-         future<variant> async_call( const fc::string& method, mutable_variant_object args );
+         future<variant> async_call( const std::string& method, mutable_variant_object args );
 
          /// Sending in an array of variants will be handled as positional arguments
-         future<variant> async_call( const fc::string& method, 
+         future<variant> async_call( const std::string& method, 
                                      const variants& args );
 
-         future<variant> async_call( const fc::string& method );
+         future<variant> async_call( const std::string& method );
 
-         future<variant> async_call( const fc::string& method, 
+         future<variant> async_call( const std::string& method, 
                                      const variant& a1 );
 
-         future<variant> async_call( const fc::string& method, 
+         future<variant> async_call( const std::string& method, 
                                      const variant& a1, 
                                      const variant& a2 );
 
-         future<variant> async_call( const fc::string& method, 
+         future<variant> async_call( const std::string& method, 
                                      const variant& a1, 
                                      const variant& a2, 
                                      const variant& a3 );
 
          template<typename Result>
-         Result call( const fc::string& method, 
+         Result call( const std::string& method, 
                                const variant& a1, 
                                const variant& a2, 
                                const variant& a3,
@@ -87,7 +87,7 @@ namespace fc { namespace rpc  {
          }
 
          template<typename Result>
-         Result call( const fc::string& method, 
+         Result call( const std::string& method, 
                                const variant& a1, 
                                const variant& a2, 
                                microseconds timeout = microseconds::maximum())
@@ -96,7 +96,7 @@ namespace fc { namespace rpc  {
          }
 
          template<typename Result>
-         Result call( const fc::string& method, 
+         Result call( const std::string& method, 
                                const variant& a1, 
                                microseconds timeout = microseconds::maximum())
          {
@@ -104,14 +104,14 @@ namespace fc { namespace rpc  {
          }
 
          template<typename Result>
-         Result call( const fc::string& method, 
+         Result call( const std::string& method, 
                                variant_object a1, 
                                microseconds timeout = microseconds::maximum())
          {
             return async_call( method, fc::move(a1) ).wait(timeout).as<Result>();
          }
          template<typename Result>
-         Result call( const fc::string& method, 
+         Result call( const std::string& method, 
                                mutable_variant_object a1, 
                                microseconds timeout = microseconds::maximum())
          {
@@ -120,13 +120,13 @@ namespace fc { namespace rpc  {
 
 
          template<typename Result>
-         Result call( const fc::string& method, microseconds timeout = microseconds::maximum() )
+         Result call( const std::string& method, microseconds timeout = microseconds::maximum() )
          {
             return async_call( method ).wait(timeout).as<Result>();
          }
 
          /// Sending in a variant_object will be issued as named parameters
-         variant call( const fc::string& method, const variant_object& named_args );
+         variant call( const std::string& method, const variant_object& named_args );
          ///@}
          
       private:

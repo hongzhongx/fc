@@ -35,8 +35,8 @@ namespace fc { namespace rpc {
          typedef std::function<variant(const variants&)>       method;
          ~state();
 
-         void add_method( const fc::string& name, method m );
-         void remove_method( const fc::string& name );
+         void add_method( const std::string& name, method m );
+         void remove_method( const std::string& name );
 
          variant local_call( const string& method_name, const variants& args );
          void    handle_reply( const response& response );
