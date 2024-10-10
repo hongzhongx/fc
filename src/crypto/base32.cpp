@@ -1,3 +1,5 @@
+#include <vector>
+
 #include <fc/crypto/base32.hpp>
 #include <CyoDecode.h>
 #include <CyoEncode.h>

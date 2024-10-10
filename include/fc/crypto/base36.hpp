@@ -1,5 +1,4 @@
 #pragma once
-#include <fc/vector.hpp>
 #include <fc/string.hpp>
 
 namespace fc

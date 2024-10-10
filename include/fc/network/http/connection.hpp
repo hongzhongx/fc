@@ -1,6 +1,7 @@
 #pragma once
-#include <fc/vector.hpp>
 #include <fc/string.hpp>
+
+#include <vector>
 #include <memory>
 
 namespace fc { 
