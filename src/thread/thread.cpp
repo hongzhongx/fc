@@ -33,7 +33,7 @@ static void set_thread_name(const char* threadName)
    {
    }
 }
-#elif defined(__linux__) && !defined(NDEBUG)
+#elif defined(__linux__)
 # include <pthread.h>
 static void set_thread_name(const char* threadName)
 {
@@ -146,6 +146,17 @@ namespace fc {
    }
 
    void          thread::debug( const std::string& d ) { /*my->debug(d);*/ }
+
+#if defined(__linux__) || defined(__APPLE__)
+#include <signal.h>
+#endif
+
+   void thread::signal(int sig)
+   {
+#if defined(__linux__) || defined(__APPLE__)
+      pthread_kill( my->boost_thread->native_handle(), sig );
+#endif
+   }
 
   void thread::quit(fc::promise<void>* quitDone /*= nullptr*/)
   {
