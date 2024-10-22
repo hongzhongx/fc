@@ -1,6 +1,6 @@
 #pragma once
-#include <stdint.h>
-#include <string>
+#include <fc/string.hpp>
+#include <fc/utility.hpp>
 #include <vector>
 
 namespace fc {

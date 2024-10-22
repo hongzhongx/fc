@@ -2,6 +2,7 @@
 #include <utility>
 #include <memory>
 
+#include <fc/string.hpp>
 #include <fc/reflect/typename.hpp>
 #include <fc/optional.hpp>
 #include <fc/fwd.hpp>
@@ -181,8 +182,8 @@ namespace fc {
   const fc::path& current_path();
 
   class variant;
-  void to_variant( const fc::path&, fc::variant&, uint32_t max_depth = 1 );
-  void from_variant( const fc::variant&, fc::path&, uint32_t max_depth = 1 );
+  void to_variant( const fc::path&,  fc::variant&  );
+  void from_variant( const fc::variant& , fc::path& );
 
   template<> struct get_typename<path> { static const char* name()   { return "path";   } };
 
@@ -226,6 +227,38 @@ namespace fc {
      temp_directory& operator=(temp_directory&& other);
      temp_directory(const fc::path& tempFolder = fc::temp_directory_path());
   };
+
+
+#if !defined(__APPLE__)
+  // this code is known to work on linux and windows.  It may work correctly on mac, 
+  // or it may need slight tweaks or extra includes.  It's disabled now to avoid giving
+  // a false sense of security.
+# define FC_HAS_SIMPLE_FILE_LOCK
+#endif
+#ifdef FC_HAS_SIMPLE_FILE_LOCK  
+  /** simple class which only allows one process to open any given file. 
+   * approximate usage:
+   * int main() {
+   *   fc::simple_file_lock instance_lock("~/.my_app/.lock");
+   *   if (!instance_lock.try_lock()) {
+   *     elog("my_app is already running");
+   *     return 1;
+   *   }
+   *   // do stuff here, file will be unlocked when instance_lock goes out of scope
+   * }
+  */
+  class simple_lock_file
+  {
+  public:
+    simple_lock_file(const path& lock_file_path);
+    ~simple_lock_file();
+    bool try_lock();
+    void unlock();
+  private:
+    class impl;
+    std::unique_ptr<impl> my;
+  };
+#endif // FC_HAS_SIMPLE_FILE_LOCK
 
 }
 

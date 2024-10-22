@@ -4,12 +4,11 @@
 #include <fc/fwd_impl.hpp>
 
 #include <fc/io/fstream.hpp>
+#include <fc/io/raw.hpp>
 
 #include <fc/log/logger.hpp>
 
 #include <fc/thread/thread.hpp>
-#include <fc/io/raw.hpp>
-#include <boost/endian/buffers.hpp>
 #include <boost/thread/mutex.hpp>
 #include <openssl/opensslconf.h>
 #ifndef OPENSSL_THREADS
@@ -21,6 +20,8 @@
 # include <windows.h>
 #endif
 
+#include <fc/macros.hpp>
+
 namespace fc {
 
 struct aes_encoder::impl 
@@ -30,15 +31,15 @@ struct aes_encoder::impl
 
 aes_encoder::aes_encoder()
 {
-  static int init = init_openssl();
-  (void)init;
+   static int init = init_openssl();
+   FC_UNUSED(init);
 }
 
 aes_encoder::~aes_encoder()
 {
 }
 
-void aes_encoder::init( const fc::sha256& key, const uint128_t& init_value )
+void aes_encoder::init( const fc::sha256& key, const fc::uint128& init_value )
 {
     my->ctx.obj = EVP_CIPHER_CTX_new();
     /* Create and initialise the context */
@@ -53,10 +54,7 @@ void aes_encoder::init( const fc::sha256& key, const uint128_t& init_value )
     *    In this example we are using 256 bit AES (i.e. a 256 bit key). The
     *    IV size for *most* modes is the same as the block size. For AES this
     *    is 128 bits */
-    boost::endian::little_uint64_buf_t iv[2];
-    iv[0] = uint128_hi64( init_value );
-    iv[1] = uint128_lo64( init_value );
-    if(1 != EVP_EncryptInit_ex(my->ctx, EVP_aes_256_cbc(), NULL, (unsigned char*)&key, (const unsigned char*)iv[0].data()))
+    if(1 != EVP_EncryptInit_ex(my->ctx, EVP_aes_256_cbc(), NULL, (unsigned char*)&key, (unsigned char*)&init_value))
     {
         FC_THROW_EXCEPTION( aes_exception, "error during aes 256 cbc encryption init", 
                            ("s", ERR_error_string( ERR_get_error(), nullptr) ) );
@@ -75,7 +73,8 @@ uint32_t aes_encoder::encode( const char* plaintxt, uint32_t plaintext_len, char
         FC_THROW_EXCEPTION( aes_exception, "error during aes 256 cbc encryption update", 
                            ("s", ERR_error_string( ERR_get_error(), nullptr) ) );
     }
-    FC_ASSERT( (uint32_t) ciphertext_len == plaintext_len, "", ("ciphertext_len",ciphertext_len)("plaintext_len",plaintext_len) );
+    FC_ASSERT( static_cast<uint32_t>(ciphertext_len) == plaintext_len, "",
+       ("ciphertext_len",ciphertext_len)("plaintext_len",plaintext_len) );
     return ciphertext_len;
 }
 #if 0
@@ -101,12 +100,12 @@ struct aes_decoder::impl
 };
 
 aes_decoder::aes_decoder()
-{
+  {
   static int init = init_openssl();
-  (void)init;
-}
+  FC_UNUSED(init);
+  }
 
-void aes_decoder::init( const fc::sha256& key, const uint128_t& init_value )
+void aes_decoder::init( const fc::sha256& key, const fc::uint128& init_value )
 {
     my->ctx.obj = EVP_CIPHER_CTX_new();
     /* Create and initialise the context */
@@ -121,10 +120,7 @@ void aes_decoder::init( const fc::sha256& key, const uint128_t& init_value )
     *    In this example we are using 256 bit AES (i.e. a 256 bit key). The
     *    IV size for *most* modes is the same as the block size. For AES this
     *    is 128 bits */
-    boost::endian::little_uint64_buf_t iv[2];
-    iv[0] = uint128_hi64( init_value );
-    iv[1] = uint128_lo64( init_value );
-    if(1 != EVP_DecryptInit_ex(my->ctx, EVP_aes_256_cbc(), NULL, (unsigned char*)&key, (const unsigned char*)iv[0].data()))
+    if(1 != EVP_DecryptInit_ex(my->ctx, EVP_aes_256_cbc(), NULL, (unsigned char*)&key, (unsigned char*)&init_value))
     {
         FC_THROW_EXCEPTION( aes_exception, "error during aes 256 cbc encryption init", 
                            ("s", ERR_error_string( ERR_get_error(), nullptr) ) );
@@ -146,7 +142,8 @@ uint32_t aes_decoder::decode( const char* ciphertxt, uint32_t ciphertxt_len, cha
         FC_THROW_EXCEPTION( aes_exception, "error during aes 256 cbc decryption update", 
                            ("s", ERR_error_string( ERR_get_error(), nullptr) ) );
     }
-    FC_ASSERT( ciphertxt_len == (uint32_t)plaintext_len, "", ("ciphertxt_len",ciphertxt_len)("plaintext_len",plaintext_len) );
+    FC_ASSERT( ciphertxt_len == static_cast<uint32_t>(plaintext_len), "",
+       ("ciphertxt_len",ciphertxt_len)("plaintext_len",plaintext_len) );
 	return plaintext_len;
 }
 #if 0
@@ -436,7 +433,9 @@ openssl_thread_config::openssl_thread_config()
 }
 openssl_thread_config::~openssl_thread_config()
 {
-  if (CRYPTO_get_id_callback() == &get_thread_id)
+  if ( CRYPTO_get_id_callback() != NULL &&
+//       &get_thread_id != NULL &&              comment out by xpeng, for compile error
+       CRYPTO_get_id_callback() == &get_thread_id)
   {
     CRYPTO_set_id_callback(NULL);
     CRYPTO_set_locking_callback(NULL);

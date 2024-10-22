@@ -1,7 +1,8 @@
 #pragma once
-#include <boost/endian/buffers.hpp>
+#include <unordered_map>
 #include <fc/fwd.hpp>
 #include <fc/io/raw_fwd.hpp>
+#include <fc/string.hpp>
 
 namespace fc
 {
@@ -16,7 +17,7 @@ class sha224
     operator string()const;
 
     char*    data()const;
-    static constexpr size_t data_size() { return 224 / 8; }
+    size_t data_size()const { return 224 / 8; }
 
     static sha224 hash( const char* d, uint32_t dlen );
     static sha224 hash( const string& );
@@ -64,27 +65,14 @@ class sha224
     friend bool   operator >= ( const sha224& h1, const sha224& h2 );
     friend bool   operator >  ( const sha224& h1, const sha224& h2 ); 
     friend bool   operator <  ( const sha224& h1, const sha224& h2 ); 
+    friend std::size_t hash_value( const sha224& v ) { return uint64_t(v._hash[1])<<32 | v._hash[2]; }
                              
-    boost::endian::little_uint32_buf_t _hash[7];
+    uint32_t _hash[7]; 
 };
 
-namespace raw {
-
-   template<typename T>
-   inline void pack( T& ds, const sha224& ep, uint32_t _max_depth ) {
-      ds << ep;
-   }
-
-   template<typename T>
-   inline void unpack( T& ds, sha224& ep, uint32_t _max_depth ) {
-      ds >> ep;
-   }
-
-}
-
   class variant;
-  void to_variant( const sha224& bi, variant& v, uint32_t max_depth );
-  void from_variant( const variant& v, sha224& bi, uint32_t max_depth );
+  void to_variant( const sha224& bi, variant& v );
+  void from_variant( const variant& v, sha224& bi );
 
 } // fc
 namespace std

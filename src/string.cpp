@@ -193,7 +193,7 @@ namespace fc  {
      }
   }
 
-   string format_string( const string& format, const variant_object& args, uint32_t max_object_depth )
+   string format_string( const string& format, const variant_object& args )
    {
       stringstream ss;
       size_t prev = 0;
@@ -226,7 +226,7 @@ namespace fc  {
                   {
                      try
                      {
-                        ss << json::to_string( val->value(), json::stringify_large_ints_and_doubles, max_object_depth );
+                        ss << json::to_string( val->value(), json::stringify_large_ints_and_doubles );
                      }
                      catch( const fc::assert_exception& e )
                      {

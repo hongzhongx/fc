@@ -2,7 +2,6 @@
 #include <fc/fwd.hpp>
 #include <fc/optional.hpp>
 #include <string>
-
 namespace fc
 {
     using std::string;
@@ -23,7 +22,7 @@ namespace fc
 
   typedef fc::optional<std::string> ostring;
   class variant_object;
-  std::string format_string( const std::string&, const variant_object&, uint32_t max_object_depth = 200 );
+  std::string format_string( const std::string&, const variant_object& );
   std::string trim( const std::string& );
   std::string to_lower( const std::string& );
   string trim_and_normalize_spaces( const string& s );

@@ -1,6 +1,6 @@
 #pragma once
 #include <stdint.h>
-#include <string>
+#include <fc/string.hpp>
 #include <fc/optional.hpp>
 
 #ifdef _MSC_VER
@@ -38,8 +38,8 @@ namespace fc {
   inline microseconds days(int64_t d) { return hours(24*d); }
 
   class variant;
-  void to_variant( const fc::microseconds&,  fc::variant&, uint32_t max_depth = 1  );
-  void from_variant( const fc::variant&, fc::microseconds&, uint32_t max_depth = 1 );
+  void to_variant( const fc::microseconds&,  fc::variant&  );
+  void from_variant( const fc::variant& , fc::microseconds& );
 
   class time_point {
     public:
@@ -127,12 +127,12 @@ namespace fc {
   /** return a human-readable approximate time, relative to now()
    * e.g., "4 hours ago", "2 months ago", etc.
    */
-  std::string get_approximate_relative_time_string(const time_point_sec& event_time,
-                                                   const time_point_sec& relative_to_time = fc::time_point::now(),
-                                                   const std::string& ago = " ago");
-  std::string get_approximate_relative_time_string(const time_point& event_time,
-                                                   const time_point& relative_to_time = fc::time_point::now(),
-                                                   const std::string& ago = " ago");
+  string get_approximate_relative_time_string(const time_point_sec& event_time,
+                                              const time_point_sec& relative_to_time = fc::time_point::now(),
+                                              const std::string& ago = " ago");
+  string get_approximate_relative_time_string(const time_point& event_time,
+                                              const time_point& relative_to_time = fc::time_point::now(),
+                                              const std::string& ago = " ago");
 }
 
 #include <fc/reflect/reflect.hpp>

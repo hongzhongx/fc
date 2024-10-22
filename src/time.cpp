@@ -3,6 +3,7 @@
 #include <boost/chrono/system_clocks.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <sstream>
+#include <fc/string.hpp>
 #include <fc/io/sstream.hpp>
 #include <fc/exception/exception.hpp>
 
@@ -17,13 +18,13 @@ namespace fc {
 
   std::string time_point_sec::to_non_delimited_iso_string()const
   {
-    const auto ptime = boost::posix_time::from_time_t( time_t( sec_since_epoch() ) );
+    const auto ptime = boost::posix_time::from_time_t( static_cast< int32_t >( sec_since_epoch() ) );
     return boost::posix_time::to_iso_string( ptime );
   }
 
   std::string time_point_sec::to_iso_string()const
   {
-    const auto ptime = boost::posix_time::from_time_t( time_t( sec_since_epoch() ) );
+    const auto ptime = boost::posix_time::from_time_t( static_cast< int32_t >( sec_since_epoch() ) );
     return boost::posix_time::to_iso_extended_string( ptime );
   }
 
@@ -40,6 +41,9 @@ namespace fc {
           pt = boost::date_time::parse_delimited_time<boost::posix_time::ptime>( s, 'T' );
       else
           pt = boost::posix_time::from_iso_string( s );
+
+      FC_ASSERT( (pt - epoch).total_seconds() <= INT32_MAX, "Datetime overflow" );
+      FC_ASSERT( (pt - epoch).total_seconds() >= INT32_MIN, "Datetime underflow" );
       return fc::time_point_sec( (pt - epoch).total_seconds() );
   } FC_RETHROW_EXCEPTIONS( warn, "unable to convert ISO-formatted string to fc::time_point_sec" ) }
 
@@ -53,16 +57,16 @@ namespace fc {
       return time_point( time_point_sec::from_iso_string( s ) );
   } FC_RETHROW_EXCEPTIONS( warn, "unable to convert ISO-formatted string to fc::time_point" ) }
 
-  void to_variant( const fc::time_point& t, variant& v, uint32_t max_depth ) {
-    to_variant( std::string( t ), v, max_depth );
+  void to_variant( const fc::time_point& t, variant& v ) {
+    v = std::string( t );
   }
-  void from_variant( const fc::variant& v, fc::time_point& t, uint32_t max_depth ) {
+  void from_variant( const fc::variant& v, fc::time_point& t ) {
     t = fc::time_point::from_iso_string( v.as_string() );
   }
-  void to_variant( const fc::time_point_sec& t, variant& v, uint32_t max_depth ) {
-    to_variant( std::string( t ), v, max_depth );
+  void to_variant( const fc::time_point_sec& t, variant& v ) {
+    v = std::string( t );
   }
-  void from_variant( const fc::variant& v, fc::time_point_sec& t, uint32_t max_depth ) {
+  void from_variant( const fc::variant& v, fc::time_point_sec& t ) {
     t = fc::time_point_sec::from_iso_string( v.as_string() );
   }
 
@@ -133,11 +137,11 @@ namespace fc {
     return get_approximate_relative_time_string(time_point_sec(event_time), time_point_sec(relative_to_time), ago);
   }
 
-  void to_variant( const microseconds& input_microseconds, variant& output_variant, uint32_t max_depth )
+  void to_variant( const microseconds& input_microseconds,  variant& output_variant )
   {
     output_variant = input_microseconds.count();
   }
-  void from_variant( const variant& input_variant, microseconds& output_microseconds, uint32_t max_depth )
+  void from_variant( const variant& input_variant,  microseconds& output_microseconds )
   {
     output_microseconds = microseconds(input_variant.as_int64());
   }

@@ -1,4 +1,5 @@
 #pragma once
+#include <fc/utility.hpp>
 #include <fc/fwd.hpp>
 #include <fc/io/iostream.hpp>
 #include <fc/time.hpp>
@@ -15,9 +16,7 @@ namespace fc {
   {
     public:
       tcp_socket();
-      tcp_socket( tcp_socket& copy ) = delete;
       ~tcp_socket();
-      tcp_socket& operator=( tcp_socket& copy ) = delete;
 
       void     connect_to( const fc::ip::endpoint& remote_endpoint );
       void     bind( const fc::ip::endpoint& local_endpoint );

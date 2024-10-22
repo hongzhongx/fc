@@ -1,6 +1,7 @@
 #include <fc/log/console_appender.hpp>
 #include <fc/log/log_message.hpp>
 #include <fc/thread/unique_lock.hpp>
+#include <fc/string.hpp>
 #include <fc/variant.hpp>
 #include <fc/reflect/variant.hpp>
 #ifndef WIN32
@@ -13,7 +14,6 @@
 #include <fc/exception/exception.hpp>
 #include <iomanip>
 #include <sstream>
-#include <mutex>
 
 
 namespace fc {
@@ -30,7 +30,7 @@ namespace fc {
    console_appender::console_appender( const variant& args )
    :my(new impl)
    {
-      configure( args.as<config>( FC_MAX_LOG_OBJECT_DEPTH ) );
+      configure( args.as<config>() );
    }
 
    console_appender::console_appender( const config& cfg )
@@ -49,9 +49,9 @@ namespace fc {
 #endif
       my->cfg = console_appender_config;
 #ifdef WIN32
-         if (my->cfg.stream == stream::std_error)
+         if (my->cfg.stream = stream::std_error)
            my->console_handle = GetStdHandle(STD_ERROR_HANDLE);
-         else if (my->cfg.stream == stream::std_out)
+         else if (my->cfg.stream = stream::std_out)
            my->console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
 #endif
 
@@ -88,16 +88,19 @@ namespace fc {
    }
 
    void console_appender::log( const log_message& m ) {
+      //std::string message = fc::format_string( m.get_format(), m.get_data() );
+      //fc::variant lmsg(m);
 
       FILE* out = stream::std_error ? stderr : stdout;
 
+      //std::string fmt_str = fc::format_string( cfg.format, mutable_variant_object(m.get_context())( "message", message)  );
       std::stringstream file_line;
       file_line << m.get_context().get_file() <<":"<<m.get_context().get_line_number() <<" ";
 
       ///////////////
       std::stringstream line;
       line << (m.get_context().get_timestamp().time_since_epoch().count() % (1000ll*1000ll*60ll*60))/1000 <<"ms ";
-      line << std::setw( 10 ) << std::left << m.get_context().get_thread_name().substr(0,9).c_str() <<" "<<std::setw(30)<< std::left <<file_line.str();
+      line << std::setw(30)<< std::left <<file_line.str();
 
       auto me = m.get_context().get_method();
       // strip all leading scopes...
@@ -113,8 +116,8 @@ namespace fc {
          line << std::setw( 20 ) << std::left << m.get_context().get_method().substr(p,20).c_str() <<" ";
       }
       line << "] ";
-      std::string message = fc::format_string( m.get_format(), m.get_data(), my->cfg.max_object_depth );
-      line << message;
+      std::string message = fc::format_string( m.get_format(), m.get_data() );
+      line << message;//.c_str();
 
       fc::unique_lock<boost::mutex> lock(log_mutex());
 
@@ -137,7 +140,7 @@ namespace fc {
       #endif
 
       if( text.size() )
-         fprintf( out, "%s", text.c_str() );
+         fprintf( out, "%s", text.c_str() ); //fmt_str.c_str() );
 
       #ifdef WIN32
       if (my->console_handle != INVALID_HANDLE_VALUE)

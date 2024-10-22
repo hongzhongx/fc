@@ -5,8 +5,13 @@
 #include <fc/crypto/openssl.hpp>
 #include <fc/crypto/ripemd160.hpp>
 
+#include <boost/endian/conversion.hpp>
+#include <boost/multiprecision/cpp_int.hpp>
+
 #ifdef _WIN32
 # include <malloc.h>
+#else
+# include <alloca.h>
 #endif
 
 /* stuff common to all ecc implementations */
@@ -16,8 +21,10 @@
 
 namespace fc { namespace ecc {
 
+   using namespace boost::multiprecision::literals;
+
     namespace detail {
-        typedef zero_initialized_array<unsigned char,37> chr37;
+        typedef fc::array<char,37> chr37;
 
         fc::sha256 _left( const fc::sha512& v )
         {
@@ -50,10 +57,10 @@ namespace fc { namespace ecc {
             return result;
         }
 
-        static chr37 _derive_message( unsigned char first, const unsigned char* key32, int i )
+        static chr37 _derive_message( char first, const char* key32, int i )
         {
             chr37 result;
-            unsigned char* dest = result.data();
+            unsigned char* dest = (unsigned char*) result.begin();
             *dest++ = first;
             memcpy( dest, key32, 32 ); dest += 32;
             _put( &dest, i );
@@ -62,12 +69,12 @@ namespace fc { namespace ecc {
 
         chr37 _derive_message( const public_key_data& key, int i )
         {
-            return _derive_message( *key.data(), key.data() + 1, i );
+            return _derive_message( *key.begin(), key.begin() + 1, i );
         }
 
         static chr37 _derive_message( const private_key_secret& key, int i )
         {
-            return _derive_message( 0, (unsigned char*) key.data(), i );
+            return _derive_message( 0, key.data(), i );
         }
 
         const ec_group& get_curve()
@@ -83,8 +90,8 @@ namespace fc { namespace ecc {
             ssl_bignum order;
             FC_ASSERT( EC_GROUP_get_order( group, order, ctx ) );
             private_key_secret bin;
-            FC_ASSERT( (size_t) BN_num_bytes( order ) == bin.data_size() );
-            FC_ASSERT( (size_t) BN_bn2bin( order, (unsigned char*) bin.data() ) == bin.data_size() );
+            FC_ASSERT( static_cast<size_t>(BN_num_bytes( order )) == bin.data_size() );
+            FC_ASSERT( static_cast<size_t>(BN_bn2bin( order, (unsigned char*) bin.data() )) == bin.data_size() );
             return bin;
         }
 
@@ -102,8 +109,8 @@ namespace fc { namespace ecc {
             FC_ASSERT( EC_GROUP_get_order( group, order, ctx ) );
             BN_rshift1( order, order );
             private_key_secret bin;
-            FC_ASSERT( (size_t) BN_num_bytes( order ) == bin.data_size() );
-            FC_ASSERT( (size_t) BN_bn2bin( order, (unsigned char*) bin.data() ) == bin.data_size() );
+            FC_ASSERT( static_cast<size_t>(BN_num_bytes( order )) == bin.data_size() );
+            FC_ASSERT( static_cast<size_t>(BN_bn2bin( order, (unsigned char*) bin.data() )) == bin.data_size() );
             return bin;
         }
 
@@ -137,40 +144,68 @@ namespace fc { namespace ecc {
 
     std::string public_key::to_base58( const public_key_data &key )
     {
-      sha256 check = sha256::hash((char*) key.data(), sizeof(key));
-      static_assert(sizeof(key) + 4 == 37, "Elliptic public key size (or its hash) is incorrect");
-      detail::chr37 data;
-      memcpy(data.data(), key.data(), key.size());
-      memcpy(data.data() + key.size(), (const char*)check._hash, 4);
-      return fc::to_base58((char*) data.data(), data.size());
+      uint32_t check = (uint32_t)sha256::hash(key.data, sizeof(key))._hash[0];
+      assert(key.size() + sizeof(check) == 37);
+      array<char, 37> data;
+      memcpy(data.data, key.begin(), key.size());
+      memcpy(data.begin() + key.size(), (const char*)&check, sizeof(check));
+      return fc::to_base58(data.begin(), data.size());
     }
 
     public_key public_key::from_base58( const std::string& b58 )
     {
-        detail::chr37 data;
+        array<char, 37> data;
         size_t s = fc::from_base58(b58, (char*)&data, sizeof(data) );
         FC_ASSERT( s == sizeof(data) );
 
         public_key_data key;
-        sha256 check = sha256::hash((char*) data.data(), sizeof(key));
-        FC_ASSERT( memcmp( (char*)check._hash, data.data() + key.size(), 4 ) == 0 );
-        memcpy( (char*)key.data(), data.data(), key.size() );
+        uint32_t check = (uint32_t)sha256::hash(data.data, sizeof(key))._hash[0];
+        FC_ASSERT( memcmp( (char*)&check, data.data + sizeof(key), sizeof(check) ) == 0 );
+        memcpy( (char*)key.data, data.data, sizeof(key) );
         return from_key_data(key);
     }
 
     unsigned int public_key::fingerprint() const
     {
         public_key_data key = serialize();
-        ripemd160 hash = ripemd160::hash( sha256::hash( (char*) key.data(), key.size() ) );
+        ripemd160 hash = ripemd160::hash( sha256::hash( key.begin(), key.size() ) );
         unsigned char* fp = (unsigned char*) hash._hash;
         return (fp[0] << 24) | (fp[1] << 16) | (fp[2] << 8) | fp[3];
     }
 
-    bool public_key::is_canonical( const compact_signature& c ) {
-        return !(c[1] & 0x80)
-               && !(c[1] == 0 && !(c[2] & 0x80))
-               && !(c[33] & 0x80)
-               && !(c[33] == 0 && !(c[34] & 0x80));
+    bool is_fc_canonical( const compact_signature& c )
+    {
+      return !(c.data[1] & 0x80)
+          && !(c.data[1] == 0 && !(c.data[2] & 0x80))
+          && !(c.data[33] & 0x80)
+          && !(c.data[33] == 0 && !(c.data[34] & 0x80));
+    }
+
+    bool is_bip_0062_canonical( const compact_signature& c )
+    {
+       using boost::multiprecision::uint256_t;
+       constexpr uint256_t n_2 =
+          0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0_cppui256;
+
+       // BIP-0062 states that sig must be in [1,n/2], however because a sig of value 0 is an invalid
+       // signature under all circumstances, the lower bound does not need checking
+       return memcmp( c.data + 33, &n_2, sizeof( uint256_t ) ) <= 0;
+    }
+
+
+    bool public_key::is_canonical( const compact_signature& c, canonical_signature_type canon_type )
+    {
+      switch( canon_type )
+      {
+        case bip_0062:
+          return is_bip_0062_canonical( c );
+        case fc_canonical:
+          return is_fc_canonical( c );
+        case non_canonical:
+          return true;
+        default:
+          return false;
+      }
     }
 
     private_key private_key::generate_from_seed( const fc::sha256& seed, const fc::sha256& offset )
@@ -190,7 +225,7 @@ namespace fc { namespace ecc {
         BN_mod(secexp, secexp, order, ctx);
 
         fc::sha256 secret;
-        FC_ASSERT(BN_num_bytes(secexp) <= int64_t(sizeof(secret)));
+        assert(BN_num_bytes(secexp) <= int64_t(sizeof(secret)));
         auto shift = sizeof(secret) - BN_num_bytes(secexp);
         BN_bn2bin(secexp, ((unsigned char*)&secret)+shift);
         return regenerate( secret );
@@ -229,9 +264,9 @@ namespace fc { namespace ecc {
 
     static std::string _to_base58( const extended_key_data& key )
     {
-        char buffer[std::tuple_size<extended_key_data>::value + 4]; // it's a small static array => allocate on stack
-        memcpy( buffer, key.data(), key.size() );
-        fc::sha256 double_hash = fc::sha256::hash( fc::sha256::hash( (char*)key.data(), key.size() ));
+        char *buffer = (char*)alloca(key.size() + 4);
+        memcpy( buffer, key.begin(), key.size() );
+        fc::sha256 double_hash = fc::sha256::hash( fc::sha256::hash( key.begin(), key.size() ));
         memcpy( buffer + key.size(), double_hash.data(), 4 );
         return fc::to_base58( buffer, sizeof(buffer) );
     }
@@ -257,17 +292,17 @@ namespace fc { namespace ecc {
     extended_key_data extended_public_key::serialize_extended() const
     {
         extended_key_data result;
-        unsigned char* dest = (unsigned char*) result.data();
+        unsigned char* dest = (unsigned char*) result.begin();
         detail::_put( &dest, BTC_EXT_PUB_MAGIC );
         *dest++ = depth;
         detail::_put( &dest, parent_fp );
         detail::_put( &dest, child_num );
         memcpy( dest, c.data(), c.data_size() ); dest += 32;
         public_key_data key = serialize();
-        memcpy( dest, key.data(), key.size() );
+        memcpy( dest, key.begin(), key.size() );
         return result;
     }
-    
+
     extended_public_key extended_public_key::deserialize( const extended_key_data& data )
     {
        return from_base58( _to_base58( data ) );
@@ -290,7 +325,7 @@ namespace fc { namespace ecc {
         fc::sha256 chain;
         memcpy( chain.data(), ptr, chain.data_size() ); ptr += chain.data_size();
         public_key_data key;
-        memcpy( key.data(), ptr, key.size() );
+        memcpy( key.begin(), ptr, key.size() );
         return extended_public_key( key, chain, cn, fp, d );
     }
 
@@ -298,6 +333,9 @@ namespace fc { namespace ecc {
     {
         return extended_public_key( get_public_key(), c, child_num, parent_fp, depth );
     }
+
+    public_key extended_public_key::generate_p(int i) const { return derive_normal_child(2*i + 0); }
+    public_key extended_public_key::generate_q(int i) const { return derive_normal_child(2*i + 1); }
 
     extended_private_key extended_private_key::derive_child(int i) const
     {
@@ -308,7 +346,7 @@ namespace fc { namespace ecc {
     {
         const detail::chr37 data = detail::_derive_message( get_public_key().serialize(), i );
         hmac_sha512 mac;
-        fc::sha512 l = mac.digest( c.data(), c.data_size(), (char*) data.data(), data.size() );
+        fc::sha512 l = mac.digest( c.data(), c.data_size(), data.begin(), data.size() );
         return private_derive_rest( l, i );
     }
 
@@ -317,14 +355,14 @@ namespace fc { namespace ecc {
         hmac_sha512 mac;
         private_key_secret key = get_secret();
         const detail::chr37 data = detail::_derive_message( key, i );
-        fc::sha512 l = mac.digest( c.data(), c.data_size(), (char*) data.data(), data.size() );
+        fc::sha512 l = mac.digest( c.data(), c.data_size(), data.begin(), data.size() );
         return private_derive_rest( l, i );
     }
 
     extended_key_data extended_private_key::serialize_extended() const
     {
         extended_key_data result;
-        unsigned char* dest = (unsigned char*) result.data();
+        unsigned char* dest = (unsigned char*) result.begin();
         detail::_put( &dest, BTC_EXT_PRIV_MAGIC );
         *dest++ = depth;
         detail::_put( &dest, parent_fp );
@@ -335,11 +373,16 @@ namespace fc { namespace ecc {
         memcpy( dest, key.data(), key.data_size() );
         return result;
     }
-    
+
     extended_private_key extended_private_key::deserialize( const extended_key_data& data )
     {
        return from_base58( _to_base58( data ) );
     }
+
+    private_key extended_private_key::generate_a(int i) const { return derive_hardened_child(4*i + 0); }
+    private_key extended_private_key::generate_b(int i) const { return derive_hardened_child(4*i + 1); }
+    private_key extended_private_key::generate_c(int i) const { return derive_hardened_child(4*i + 2); }
+    private_key extended_private_key::generate_d(int i) const { return derive_hardened_child(4*i + 3); }
 
     std::string extended_private_key::str() const
     {
@@ -378,27 +421,27 @@ namespace fc { namespace ecc {
     }
 }
 
-void to_variant( const ecc::private_key& var, variant& vo, uint32_t max_depth )
+void to_variant( const ecc::private_key& var,  variant& vo )
 {
-    to_variant( var.get_secret(), vo, max_depth );
+    vo = var.get_secret();
 }
 
-void from_variant( const variant& var,  ecc::private_key& vo, uint32_t max_depth )
+void from_variant( const variant& var,  ecc::private_key& vo )
 {
     fc::sha256 sec;
-    from_variant( var, sec, max_depth );
+    from_variant( var, sec );
     vo = ecc::private_key::regenerate(sec);
 }
 
-void to_variant( const ecc::public_key& var, variant& vo, uint32_t max_depth )
+void to_variant( const ecc::public_key& var,  variant& vo )
 {
-    to_variant( var.serialize(), vo, max_depth );
+    vo = var.serialize();
 }
 
-void from_variant( const variant& var,  ecc::public_key& vo, uint32_t max_depth )
+void from_variant( const variant& var,  ecc::public_key& vo )
 {
     ecc::public_key_data dat;
-    from_variant( var, dat, max_depth );
+    from_variant( var, dat );
     vo = ecc::public_key(dat);
 }
 

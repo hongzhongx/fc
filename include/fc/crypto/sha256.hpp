@@ -1,13 +1,13 @@
 #pragma once
-#include <boost/endian/buffers.hpp>
 #include <fc/fwd.hpp>
 #include <fc/string.hpp>
+#include <fc/platform_independence.hpp>
 #include <fc/io/raw_fwd.hpp>
 
 namespace fc
 {
 
-class sha256 
+class sha256
 {
   public:
     sha256();
@@ -18,21 +18,21 @@ class sha256
     operator string()const;
 
     char*    data()const;
-    static constexpr size_t data_size() { return 256 / 8; }
+    size_t data_size()const { return 256 / 8; }
 
     static sha256 hash( const char* d, uint32_t dlen );
     static sha256 hash( const string& );
     static sha256 hash( const sha256& );
 
     template<typename T>
-    static sha256 hash( const T& t ) 
-    { 
-      sha256::encoder e; 
+    static sha256 hash( const T& t )
+    {
+      sha256::encoder e;
       fc::raw::pack(e,t);
-      return e.result(); 
-    } 
+      return e.result();
+    }
 
-    class encoder 
+    class encoder
     {
       public:
         encoder();
@@ -65,31 +65,46 @@ class sha256
     friend bool   operator != ( const sha256& h1, const sha256& h2 );
     friend sha256 operator ^  ( const sha256& h1, const sha256& h2 );
     friend bool   operator >= ( const sha256& h1, const sha256& h2 );
-    friend bool   operator >  ( const sha256& h1, const sha256& h2 ); 
-    friend bool   operator <  ( const sha256& h1, const sha256& h2 ); 
+    friend bool   operator >  ( const sha256& h1, const sha256& h2 );
+    friend bool   operator <  ( const sha256& h1, const sha256& h2 );
 
-    boost::endian::little_uint64_buf_t _hash[4];
+    uint32_t pop_count()const
+    {
+       return (uint32_t)(__builtin_popcountll(_hash[0]) +
+                         __builtin_popcountll(_hash[1]) +
+                         __builtin_popcountll(_hash[2]) +
+                         __builtin_popcountll(_hash[3]));
+    }
+
+    /**
+     * Count leading zero bits
+     */
+    uint16_t clz()const;
+
+    /**
+     * Approximate (log_2(x) + 1) * 2**24.
+     *
+     * Detailed specs:
+     * - Return 0 when x == 0.
+     * - High 8 bits of result simply counts nonzero bits.
+     * - Low 24 bits of result are the 24 bits of input immediately after the most significant 1 in the input.
+     * - If above would require reading beyond the end of the input, zeros are used instead.
+     */
+    uint32_t approx_log_32()const;
+
+    void set_to_inverse_approx_log_32( uint32_t x );
+    static double inverse_approx_log_32_double( uint32_t x );
+
+    uint64_t _hash[4];
 };
-
-namespace raw {
-
-   template<typename T>
-   inline void pack( T& ds, const sha256& ep, uint32_t _max_depth ) {
-      ds << ep;
-   }
-
-   template<typename T>
-   inline void unpack( T& ds, sha256& ep, uint32_t _max_depth ) {
-      ds >> ep;
-   }
-
-}
 
   typedef sha256 uint256;
 
   class variant;
-  void to_variant( const sha256& bi, variant& v, uint32_t max_depth );
-  void from_variant( const variant& v, sha256& bi, uint32_t max_depth );
+  void to_variant( const sha256& bi, variant& v );
+  void from_variant( const variant& v, sha256& bi );
+
+  uint64_t hash64(const char* buf, size_t len);
 
 } // fc
 namespace std
@@ -103,6 +118,20 @@ namespace std
        }
     };
 }
+
+/*
+namespace boost
+{
+    template<>
+    struct hash<fc::sha256>
+    {
+       size_t operator()( const fc::sha256& s )const
+       {
+           return  s._hash[3];// *((size_t*)&s);
+       }
+    };
+}
+*/
 
 #include <fc/reflect/reflect.hpp>
 FC_REFLECT_TYPENAME( fc::sha256 )

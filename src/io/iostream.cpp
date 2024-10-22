@@ -3,6 +3,7 @@
 #include <fc/thread/thread.hpp>
 #include <iostream>
 #include <string.h>
+//#include <fc/log.hpp>
 #include <fc/thread/mutex.hpp>
 #include <fc/thread/scoped_lock.hpp>
 #include <string>
@@ -24,7 +25,7 @@ namespace fc {
       std::cin.read(&c,1);
       while( !std::cin.eof() ) {
         while( write_pos - read_pos > 0xfffff ) {
-          fc::promise<void>::ptr wr = fc::promise<void>::create("cin_buffer::write_ready");
+          fc::promise<void>::ptr wr( new fc::promise<void>("cin_buffer::write_ready") );
           write_ready = wr;
           if( write_pos - read_pos <= 0xfffff ) {
             wr->wait();
@@ -103,7 +104,7 @@ namespace fc {
   size_t cin_t::readsome( char* buf, size_t len ) {
     cin_buffer& b = get_cin_buffer();
     int64_t avail = b.write_pos - b.read_pos;
-    avail = (std::min)(int64_t(len),avail);
+    avail = (fc::min)(int64_t(len),avail);
     int64_t u = 0;
 
     if( !((avail>0) && (len>0)) ) {
@@ -138,7 +139,7 @@ namespace fc {
     do {
         while( !b.eof &&  (b.write_pos - b.read_pos)==0 ){ 
            // wait for more... 
-           fc::promise<void>::ptr rr = fc::promise<void>::create("cin_buffer::read_ready");
+           fc::promise<void>::ptr rr( new fc::promise<void>("cin_buffer::read_ready") );
            {  // copy read_ready because it is accessed from multiple threads
              fc::scoped_lock<boost::mutex> lock( b.read_ready_mutex ); 
              b.read_ready = rr;
@@ -193,6 +194,13 @@ namespace fc {
      o.write( v.c_str(), v.size() );
      return o;
   }
+#ifdef USE_FC_STRING
+  ostream& operator<<( ostream& o, const std::string& v )
+  {
+     o.write( v.c_str(), v.size() );
+     return o;
+  }
+#endif
 
   ostream& operator<<( ostream& o, const double& v )
   {
@@ -258,11 +266,80 @@ namespace fc {
      return o;
   }
 
+#ifdef USE_FC_STRING
+  istream& operator>>( istream& o, std::string& v )
+  {
+     assert(false && "not implemented");
+     return o;
+  }
+#endif
+
   istream& operator>>( istream& o, char& v )
   {
      o.read(&v,1);
      return o;
   }
+
+  istream& operator>>( istream& o, double& v )
+  {
+     assert(false && "not implemented");
+     return o;
+  }
+
+  istream& operator>>( istream& o, float& v )
+  {
+     assert(false && "not implemented");
+     return o;
+  }
+
+  istream& operator>>( istream& o, int64_t& v )
+  {
+     assert(false && "not implemented");
+     return o;
+  }
+
+  istream& operator>>( istream& o, uint64_t& v )
+  {
+     assert(false && "not implemented");
+     return o;
+  }
+
+  istream& operator>>( istream& o, int32_t& v )
+  {
+     assert(false && "not implemented");
+     return o;
+  }
+
+  istream& operator>>( istream& o, uint32_t& v )
+  {
+     assert(false && "not implemented");
+     return o;
+  }
+
+  istream& operator>>( istream& o, int16_t& v )
+  {
+     assert(false && "not implemented");
+     return o;
+  }
+
+  istream& operator>>( istream& o, uint16_t& v )
+  {
+     assert(false && "not implemented");
+     return o;
+  }
+
+  istream& operator>>( istream& o, int8_t& v )
+  {
+     assert(false && "not implemented");
+     return o;
+  }
+
+  istream& operator>>( istream& o, uint8_t& v )
+  {
+     assert(false && "not implemented");
+     return o;
+  }
+
 
   char istream::get()
   {

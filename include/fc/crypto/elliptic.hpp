@@ -1,13 +1,11 @@
 #pragma once
-#include <fc/container/zeroed_array.hpp>
 #include <fc/crypto/bigint.hpp>
 #include <fc/crypto/openssl.hpp>
 #include <fc/crypto/sha256.hpp>
 #include <fc/crypto/sha512.hpp>
 #include <fc/fwd.hpp>
+#include <fc/array.hpp>
 #include <fc/io/raw_fwd.hpp>
-
-#include <array>
 
 namespace fc {
 
@@ -18,15 +16,24 @@ namespace fc {
       class private_key_impl;
     }
 
-    typedef fc::sha256                               blind_factor_type;
-    typedef zero_initialized_array<unsigned char,33> commitment_type;
-    typedef zero_initialized_array<unsigned char,33> public_key_data;
-    typedef fc::sha256                               private_key_secret;
-    typedef zero_initialized_array<unsigned char,65> public_key_point_data; ///< the full non-compressed version of the ECC point
-    typedef zero_initialized_array<unsigned char,72> signature;
-    typedef zero_initialized_array<unsigned char,65> compact_signature;
-    typedef std::vector<char>                        range_proof_type;
-    typedef zero_initialized_array<unsigned char,78> extended_key_data;
+    typedef fc::sha256                  blind_factor_type;
+    typedef fc::array<char,33>          commitment_type;
+    typedef fc::array<char,33>          public_key_data;
+    typedef fc::sha256                  private_key_secret;
+    typedef fc::array<char,65>          public_key_point_data; ///< the full non-compressed version of the ECC point
+    typedef fc::array<char,72>          signature;
+    typedef fc::array<unsigned char,65> compact_signature;
+    typedef std::vector<char>           range_proof_type;
+    typedef fc::array<char,78>          extended_key_data;
+    typedef fc::sha256                  blinded_hash;
+    typedef fc::sha256                  blind_signature;
+
+    enum canonical_signature_type
+    {
+      non_canonical,
+      bip_0062,
+      fc_canonical
+    };
 
     /**
      *  @class public_key
@@ -38,6 +45,7 @@ namespace fc {
            public_key();
            public_key(const public_key& k);
            ~public_key();
+//           bool verify( const fc::sha256& digest, const signature& sig );
            public_key_data serialize()const;
            public_key_point_data serialize_ecc_point()const;
 
@@ -46,11 +54,13 @@ namespace fc {
 
            public_key( const public_key_data& v );
            public_key( const public_key_point_data& v );
-           public_key( const compact_signature& c, const fc::sha256& digest, bool check_canonical = true );
+           public_key( const compact_signature& c, const fc::sha256& digest, canonical_signature_type canon_type = fc_canonical );
 
            public_key child( const fc::sha256& offset )const;
 
            bool valid()const;
+           /** Computes new pubkey = generator * offset + old pubkey ?! */
+//           public_key mult( const fc::sha256& offset )const;
            /** Computes new pubkey = regenerate(offset).pubkey + old pubkey
             *                      = offset * G + 1 * old pubkey ?! */
            public_key add( const fc::sha256& offset )const;
@@ -75,10 +85,12 @@ namespace fc {
 
            unsigned int fingerprint() const;
 
+           static bool is_canonical( const compact_signature& c, canonical_signature_type canon_type );
+
         private:
           friend class private_key;
           static public_key from_key_data( const public_key_data& v );
-          static bool is_canonical( const compact_signature& c );
+
           fc::fwd<detail::public_key_impl,33> my;
     };
 
@@ -119,7 +131,9 @@ namespace fc {
             */
            fc::sha512 get_shared_secret( const public_key& pub )const;
 
-           compact_signature sign_compact( const fc::sha256& digest, bool require_canonical = true )const;
+//           signature         sign( const fc::sha256& digest )const;
+           compact_signature sign_compact( const fc::sha256& digest, canonical_signature_type canon_type = fc_canonical )const;
+//           bool              verify( const fc::sha256& digest, const signature& sig );
 
            public_key get_public_key()const;
 
@@ -159,6 +173,8 @@ namespace fc {
             std::string to_base58() const { return str(); }
             static extended_public_key from_base58( const std::string& base58 );
 
+            public_key generate_p( int i ) const;
+            public_key generate_q( int i ) const;
         private:
             sha256 c;
             int child_num, parent_fp;
@@ -185,9 +201,25 @@ namespace fc {
             static extended_private_key generate_master( const std::string& seed );
             static extended_private_key generate_master( const char* seed, uint32_t seed_len );
 
-    private:
+            // Oleg Andreev's blind signature scheme,
+            // see http://blog.oleganza.com/post/77474860538/blind-signatures
+            public_key blind_public_key( const extended_public_key& bob, int i ) const;
+            blinded_hash blind_hash( const fc::sha256& hash, int i ) const;
+            blind_signature blind_sign( const blinded_hash& hash, int i ) const;
+            // WARNING! This may produce non-canonical signatures!
+            compact_signature unblind_signature( const extended_public_key& bob,
+                                                 const blind_signature& sig,
+                                                 const fc::sha256& hash, int i ) const;
+
+        private:
             extended_private_key private_derive_rest( const fc::sha512& hash,
                                                       int num ) const;
+            private_key generate_a( int i ) const;
+            private_key generate_b( int i ) const;
+            private_key generate_c( int i ) const;
+            private_key generate_d( int i ) const;
+            private_key_secret compute_p( int i ) const;
+            private_key_secret compute_q( int i, const private_key_secret& p ) const;
             sha256 c;
             int child_num, parent_fp;
             uint8_t depth;
@@ -195,8 +227,8 @@ namespace fc {
 
      struct range_proof_info
      {
-         int64_t      exp;
-         int64_t      mantissa;
+         int          exp;
+         int          mantissa;
          uint64_t     min_value;
          uint64_t     max_value;
      };
@@ -229,43 +261,39 @@ namespace fc {
 
 
   } // namespace ecc
-  void to_variant( const ecc::private_key& var,  variant& vo, uint32_t max_depth );
-  void from_variant( const variant& var,  ecc::private_key& vo, uint32_t max_depth );
-  void to_variant( const ecc::public_key& var,  variant& vo, uint32_t max_depth );
-  void from_variant( const variant& var,  ecc::public_key& vo, uint32_t max_depth );
+  void to_variant( const ecc::private_key& var,  variant& vo );
+  void from_variant( const variant& var,  ecc::private_key& vo );
+  void to_variant( const ecc::public_key& var,  variant& vo );
+  void from_variant( const variant& var,  ecc::public_key& vo );
 
   namespace raw
   {
       template<typename Stream>
-      void unpack( Stream& s, fc::ecc::public_key& pk, uint32_t _max_depth )
+      void unpack( Stream& s, fc::ecc::public_key& pk)
       {
-          FC_ASSERT( _max_depth > 0 );
           ecc::public_key_data ser;
-          fc::raw::unpack( s, ser, _max_depth - 1 );
+          fc::raw::unpack(s,ser);
           pk = fc::ecc::public_key( ser );
       }
 
       template<typename Stream>
-      void pack( Stream& s, const fc::ecc::public_key& pk, uint32_t _max_depth )
+      void pack( Stream& s, const fc::ecc::public_key& pk)
       {
-          FC_ASSERT( _max_depth > 0 );
-          fc::raw::pack( s, pk.serialize(), _max_depth - 1 );
+          fc::raw::pack( s, pk.serialize() );
       }
 
       template<typename Stream>
-      void unpack( Stream& s, fc::ecc::private_key& pk, uint32_t _max_depth )
+      void unpack( Stream& s, fc::ecc::private_key& pk)
       {
-          FC_ASSERT( _max_depth > 0 );
           fc::sha256 sec;
-          unpack( s, sec, _max_depth - 1 );
+          unpack( s, sec );
           pk = ecc::private_key::regenerate(sec);
       }
 
       template<typename Stream>
-      void pack( Stream& s, const fc::ecc::private_key& pk, uint32_t _max_depth )
+      void pack( Stream& s, const fc::ecc::private_key& pk)
       {
-          FC_ASSERT( _max_depth > 0 );
-          fc::raw::pack( s, pk.get_secret(), _max_depth - 1 );
+          fc::raw::pack( s, pk.get_secret() );
       }
 
   } // namespace raw

@@ -5,6 +5,7 @@
  */
 #include <fc/log/logger.hpp>
 #include <fc/optional.hpp>
+#include <fc/macros.hpp>
 #include <exception>
 #include <functional>
 #include <unordered_map>
@@ -32,11 +33,11 @@ namespace fc
        invalid_operation_exception_code  = 14,
        unknown_host_exception_code       = 15,
        null_optional_code                = 16,
+       udt_error_code                    = 17,
        aes_error_code                    = 18,
        overflow_code                     = 19,
        underflow_code                    = 20,
-       divide_by_zero_code               = 21,
-       method_not_found_exception_code   = 22
+       divide_by_zero_code               = 21
    };
 
    /**
@@ -106,7 +107,7 @@ namespace fc
           *
           *  @note does not return.
           */
-         [[noreturn]] virtual void dynamic_rethrow_exception()const;
+         virtual NO_RETURN void     dynamic_rethrow_exception()const;
 
          /**
           *  This is equivalent to:
@@ -117,8 +118,8 @@ namespace fc
           */
           virtual std::shared_ptr<exception> dynamic_copy_exception()const;
 
-         friend void to_variant( const exception& e, variant& v, uint32_t max_depth );
-         friend void from_variant( const variant& e, exception& ll, uint32_t max_depth );
+         friend void to_variant( const exception& e, variant& v );
+         friend void from_variant( const variant& e, exception& ll );
 
          exception& operator=( const exception& copy );
          exception& operator=( exception&& copy );
@@ -126,8 +127,8 @@ namespace fc
          std::unique_ptr<detail::exception_impl> my;
    };
 
-   void to_variant( const exception& e, variant& v, uint32_t max_depth );
-   void from_variant( const variant& e, exception& ll, uint32_t max_depth );
+   void to_variant( const exception& e, variant& v );
+   void from_variant( const variant& e, exception& ll );
    typedef std::shared_ptr<exception> exception_ptr;
 
    typedef optional<exception> oexception;
@@ -155,7 +156,7 @@ namespace fc
 
        std::exception_ptr get_inner_exception()const;
 
-       [[noreturn]] virtual void            dynamic_rethrow_exception()const;
+       virtual NO_RETURN void               dynamic_rethrow_exception()const;
        virtual std::shared_ptr<exception>   dynamic_copy_exception()const;
       private:
        std::exception_ptr _inner;
@@ -166,10 +167,10 @@ namespace fc
    {
 #if defined(_MSC_VER) && (_MSC_VER < 1700)
      return std::make_shared<unhandled_exception>( log_message(),
-                                                   std::copy_exception(std::forward<T>(e)) );
+                                                   std::copy_exception(fc::forward<T>(e)) );
 #else
      return std::make_shared<unhandled_exception>( log_message(),
-                                                   std::make_exception_ptr(std::forward<T>(e)) );
+                                                   std::make_exception_ptr(fc::forward<T>(e)) );
 #endif
    }
 
@@ -179,13 +180,13 @@ namespace fc
       public:
         struct base_exception_builder
         {
-           [[noreturn]] virtual void rethrow( const exception& e )const = 0;
+           virtual NO_RETURN void rethrow( const exception& e )const = 0;
         };
 
         template<typename T>
         struct exception_builder : public base_exception_builder
         {
-           [[noreturn]] virtual void rethrow( const exception& e )const override
+           virtual NO_RETURN void rethrow( const exception& e )const override
            {
               throw T( e );
            }
@@ -201,7 +202,7 @@ namespace fc
            _registered_exceptions[T::code_value] = &builder;
         }
 
-        [[noreturn]] void rethrow( const exception& e )const;
+        void NO_RETURN rethrow( const exception& e )const;
 
         static exception_factory& instance()
         {
@@ -216,105 +217,88 @@ namespace fc
    fc::exception_factory::instance().register_exception<base>();
 
 #define FC_REGISTER_EXCEPTIONS( SEQ )\
-     \
-   static bool exception_init = []()->bool{ \
+   static bool exception_init = []( __attribute__((unused)) bool* )->bool{ \
     BOOST_PP_SEQ_FOR_EACH( FC_REGISTER_EXCEPTION, v, SEQ )  \
       return true; \
-   }();  \
+   }( &exception_init ); \
 
 
-#define FC_DECLARE_DERIVED_EXCEPTION( TYPE, BASE, CODE ) \
+#define FC_DECLARE_DERIVED_EXCEPTION( TYPE, BASE, CODE, WHAT ) \
    class TYPE : public BASE  \
    { \
       public: \
        enum code_enum { \
           code_value = CODE, \
        }; \
-       explicit TYPE( int64_t code, const std::string& name_value, const std::string& what_value ); \
-       explicit TYPE( fc::log_message&& m, int64_t code, const std::string& name_value, const std::string& what_value ); \
-       explicit TYPE( fc::log_messages&& m, int64_t code, const std::string& name_value, const std::string& what_value );\
-       explicit TYPE( const fc::log_messages& m, int64_t code, const std::string& name_value, const std::string& what_value );\
-       explicit TYPE( const std::string& what_value, const fc::log_messages& m ); \
-       explicit TYPE( fc::log_message&& m ); \
-       explicit TYPE( fc::log_messages msgs ); \
-       TYPE( TYPE&& c ) = default; \
-       TYPE( const TYPE& c ); \
-       TYPE( const BASE& c ); \
-       explicit TYPE();\
+       explicit TYPE( int64_t code, const std::string& name_value, const std::string& what_value ) \
+       :BASE( code, name_value, what_value ){} \
+       explicit TYPE( fc::log_message&& m, int64_t code, const std::string& name_value, const std::string& what_value ) \
+       :BASE( std::move(m), code, name_value, what_value ){} \
+       explicit TYPE( fc::log_messages&& m, int64_t code, const std::string& name_value, const std::string& what_value )\
+       :BASE( std::move(m), code, name_value, what_value ){}\
+       explicit TYPE( const fc::log_messages& m, int64_t code, const std::string& name_value, const std::string& what_value )\
+       :BASE( m, code, name_value, what_value ){}\
+       TYPE( const std::string& what_value, const fc::log_messages& m ) \
+       :BASE( m, CODE, BOOST_PP_STRINGIZE(TYPE), what_value ){} \
+       TYPE( fc::log_message&& m ) \
+       :BASE( fc::move(m), CODE, BOOST_PP_STRINGIZE(TYPE), WHAT ){}\
+       TYPE( fc::log_messages msgs ) \
+       :BASE( fc::move( msgs ), CODE, BOOST_PP_STRINGIZE(TYPE), WHAT ) {} \
+       TYPE( const TYPE& c ) \
+       :BASE(c){} \
+       TYPE( const BASE& c ) \
+       :BASE(c){} \
+       TYPE():BASE(CODE, BOOST_PP_STRINGIZE(TYPE), WHAT){}\
        \
-       virtual std::shared_ptr<fc::exception> dynamic_copy_exception()const;\
-       [[noreturn]] virtual void dynamic_rethrow_exception()const; \
+       virtual std::shared_ptr<fc::exception> dynamic_copy_exception()const\
+       { return std::make_shared<TYPE>( *this ); } \
+       virtual NO_RETURN void     dynamic_rethrow_exception()const \
+       { if( code() == CODE ) throw *this;\
+         else fc::exception::dynamic_rethrow_exception(); \
+       } \
    };
 
-#define FC_IMPLEMENT_DERIVED_EXCEPTION( TYPE, BASE, CODE, WHAT ) \
-   TYPE::TYPE( int64_t code, const std::string& name_value, const std::string& what_value ) \
-      : BASE( code, name_value, what_value ) {} \
-   TYPE::TYPE( fc::log_message&& m, int64_t code, const std::string& name_value, const std::string& what_value ) \
-      : BASE( std::move(m), code, name_value, what_value ) {} \
-   TYPE::TYPE( fc::log_messages&& m, int64_t code, const std::string& name_value, const std::string& what_value ) \
-      : BASE( std::move(m), code, name_value, what_value ) {} \
-   TYPE::TYPE( const fc::log_messages& m, int64_t code, const std::string& name_value, const std::string& what_value ) \
-      : BASE( m, code, name_value, what_value ) {} \
-   TYPE::TYPE( const std::string& what_value, const fc::log_messages& m ) \
-      : BASE( m, CODE, BOOST_PP_STRINGIZE(TYPE), what_value ) {} \
-   TYPE::TYPE( fc::log_message&& m ) \
-      : BASE( std::move(m), CODE, BOOST_PP_STRINGIZE(TYPE), WHAT ) {} \
-   TYPE::TYPE( fc::log_messages msgs ) \
-      : BASE( std::move( msgs ), CODE, BOOST_PP_STRINGIZE(TYPE), WHAT ) {} \
-   TYPE::TYPE( const TYPE& c ) : BASE(c) {} \
-   TYPE::TYPE( const BASE& c ) : BASE(c) {} \
-   TYPE::TYPE() : BASE(CODE, BOOST_PP_STRINGIZE(TYPE), WHAT) {} \
-   \
-   std::shared_ptr<fc::exception> TYPE::dynamic_copy_exception()const \
-   { \
-      return std::make_shared<TYPE>( *this ); \
-   } \
-   [[noreturn]] void TYPE::dynamic_rethrow_exception()const \
-   { \
-      if( code() == CODE ) throw *this;\
-      else fc::exception::dynamic_rethrow_exception(); \
-   }
+  #define FC_DECLARE_EXCEPTION( TYPE, CODE, WHAT ) \
+      FC_DECLARE_DERIVED_EXCEPTION( TYPE, fc::exception, CODE, WHAT )
 
-#define FC_DECLARE_EXCEPTION( TYPE, CODE ) \
-      FC_DECLARE_DERIVED_EXCEPTION( TYPE, fc::exception, CODE )
-
-#define FC_IMPLEMENT_EXCEPTION( TYPE, CODE, WHAT ) \
-   FC_IMPLEMENT_DERIVED_EXCEPTION( TYPE, fc::exception, CODE, WHAT )
-
-  FC_DECLARE_EXCEPTION( timeout_exception, timeout_exception_code );
-  FC_DECLARE_EXCEPTION( file_not_found_exception, file_not_found_exception_code );
+  FC_DECLARE_EXCEPTION( timeout_exception, timeout_exception_code, "Timeout" );
+  FC_DECLARE_EXCEPTION( file_not_found_exception, file_not_found_exception_code, "File Not Found" );
   /**
-   * @brief reports parse errors
+   * @brief report's parse errors
    */
-  FC_DECLARE_EXCEPTION( parse_error_exception, parse_error_exception_code );
-  FC_DECLARE_EXCEPTION( invalid_arg_exception, invalid_arg_exception_code );
+  FC_DECLARE_EXCEPTION( parse_error_exception, parse_error_exception_code, "Parse Error" );
+  FC_DECLARE_EXCEPTION( invalid_arg_exception, invalid_arg_exception_code, "Invalid Argument" );
   /**
    * @brief reports when a key, guid, or other item is not found.
    */
-  FC_DECLARE_EXCEPTION( key_not_found_exception, key_not_found_exception_code );
-  FC_DECLARE_EXCEPTION( bad_cast_exception, bad_cast_exception_code );
-  FC_DECLARE_EXCEPTION( out_of_range_exception, out_of_range_exception_code );
-  FC_DECLARE_EXCEPTION( method_not_found_exception, method_not_found_exception_code );
+  FC_DECLARE_EXCEPTION( key_not_found_exception, key_not_found_exception_code, "Key Not Found" );
+  FC_DECLARE_EXCEPTION( bad_cast_exception, bad_cast_exception_code, "Bad Cast" );
+  FC_DECLARE_EXCEPTION( out_of_range_exception, out_of_range_exception_code, "Out of Range" );
 
   /** @brief if an operation is unsupported or not valid this may be thrown */
-  FC_DECLARE_EXCEPTION( invalid_operation_exception, invalid_operation_exception_code );
+  FC_DECLARE_EXCEPTION( invalid_operation_exception,
+                        invalid_operation_exception_code,
+                        "Invalid Operation" );
   /** @brief if an host name can not be resolved this may be thrown */
-  FC_DECLARE_EXCEPTION( unknown_host_exception, unknown_host_exception_code );
+  FC_DECLARE_EXCEPTION( unknown_host_exception,
+                         unknown_host_exception_code,
+                         "Unknown Host" );
 
   /**
    *  @brief used to report a canceled Operation
    */
-  FC_DECLARE_EXCEPTION( canceled_exception, canceled_exception_code );
+  FC_DECLARE_EXCEPTION( canceled_exception, canceled_exception_code, "Canceled" );
   /**
    *  @brief used inplace of assert() to report violations of pre conditions.
    */
-  FC_DECLARE_EXCEPTION( assert_exception, assert_exception_code );
-  FC_DECLARE_EXCEPTION( eof_exception, eof_exception_code );
-  FC_DECLARE_EXCEPTION( null_optional, null_optional_code );
-  FC_DECLARE_EXCEPTION( aes_exception, aes_error_code );
-  FC_DECLARE_EXCEPTION( overflow_exception, overflow_code );
-  FC_DECLARE_EXCEPTION( underflow_exception, underflow_code );
-  FC_DECLARE_EXCEPTION( divide_by_zero_exception, divide_by_zero_code );
+  FC_DECLARE_EXCEPTION( assert_exception, assert_exception_code, "Assert Exception" );
+  FC_DECLARE_EXCEPTION( eof_exception, eof_exception_code, "End Of File" );
+  FC_DECLARE_EXCEPTION( null_optional, null_optional_code, "null optional" );
+  FC_DECLARE_EXCEPTION( udt_exception, udt_error_code, "UDT error" );
+  FC_DECLARE_EXCEPTION( aes_exception, aes_error_code, "AES error" );
+  FC_DECLARE_EXCEPTION( overflow_exception, overflow_code, "Integer Overflow" );
+  FC_DECLARE_EXCEPTION( underflow_exception, underflow_code, "Integer Underflow" );
+  FC_DECLARE_EXCEPTION( divide_by_zero_exception, divide_by_zero_code, "Integer Divide By Zero" );
 
   std::string except_str();
 
@@ -373,8 +357,7 @@ namespace fc
 /**
  *  @def FC_THROW_EXCEPTION( EXCEPTION, FORMAT, ... )
  *  @param EXCEPTION a class in the Phoenix::Athena::API namespace that inherits
- *  @param FORMAT a const char* string with "${keys}"
- *  @param ... other parameters
+ *  @param format - a const char* string with "${keys}"
  */
 #define FC_THROW_EXCEPTION( EXCEPTION, FORMAT, ... ) \
   FC_MULTILINE_MACRO_BEGIN \
@@ -465,11 +448,11 @@ namespace fc
    catch( fc::exception& er ) { \
       FC_RETHROW_EXCEPTION( er, LOG_LEVEL, FORMAT, __VA_ARGS__ ); \
    } catch( const std::exception& e ) {  \
-      throw fc::exception( \
+      fc::exception fce( \
                 FC_LOG_MESSAGE( LOG_LEVEL, "${what}: " FORMAT,__VA_ARGS__("what",e.what())), \
                 fc::std_exception_code,\
                 typeid(e).name(), \
-                e.what() ) ;\
+                e.what() ) ; throw fce;\
    } catch( ... ) {  \
       throw fc::unhandled_exception( \
                 FC_LOG_MESSAGE( LOG_LEVEL, FORMAT,__VA_ARGS__), \
@@ -480,11 +463,11 @@ namespace fc
    catch( fc::exception& er ) { \
       FC_RETHROW_EXCEPTION( er, warn, "", FC_FORMAT_ARG_PARAMS(__VA_ARGS__) ); \
    } catch( const std::exception& e ) {  \
-      throw fc::exception( \
+      fc::exception fce( \
                 FC_LOG_MESSAGE( warn, "${what}: ",FC_FORMAT_ARG_PARAMS(__VA_ARGS__)("what",e.what())), \
                 fc::std_exception_code,\
                 typeid(e).name(), \
-                e.what() ) ;\
+                e.what() ) ; throw fce;\
    } catch( ... ) {  \
       throw fc::unhandled_exception( \
                 FC_LOG_MESSAGE( warn, "",FC_FORMAT_ARG_PARAMS(__VA_ARGS__)), \

@@ -1,4 +1,5 @@
 #include <fc/network/url.hpp>
+#include <fc/string.hpp>
 #include <fc/io/sstream.hpp>
 #include <fc/exception/exception.hpp>
 #include <fc/log/logger.hpp>
@@ -26,10 +27,10 @@ namespace fc
              if( user_pass.find( ':' ) != size_t(std::string::npos) ) {
                 std::getline( upss, luser, ':' );
                 std::getline( upss, lpass, ':' );
-                _user = std::move(luser);
-                _pass = std::move(lpass);
+                _user = fc::move(luser);
+                _pass = fc::move(lpass);
              } else {
-                _user = std::move(user_pass);
+                _user = fc::move(user_pass);
              }
            }
            std::string host_port;
@@ -43,10 +44,11 @@ namespace fc
               }
               _host = host_port.substr(0,pos);
            } else {
-              _host = std::move(host_port);
+              _host = fc::move(host_port);
            }
-           std::getline( ss, _lpath, '?' );
-#ifdef WIN32
+           //std::getline( ss, _lpath, '?' );
+           std::getline( ss, _lpath); //changed by xpeng, include args
+ #ifdef WIN32
            // On windows, a URL like file:///c:/autoexec.bat would result in _lpath = c:/autoexec.bat
            // which is what we really want (it's already an absolute path)
            if (!stricmp(_proto.c_str(), "file"))
@@ -61,7 +63,7 @@ namespace fc
            std::getline( ss, _largs );
            if( _args.valid() && _args->size() ) 
            {
-             // TODO: args = std::move(_args);
+             // TODO: args = fc::move(_args);
            }
          }
 
@@ -75,11 +77,11 @@ namespace fc
     };
   }
 
-  void to_variant( const url& u, fc::variant& v, uint32_t max_depth )
+  void to_variant( const url& u, fc::variant& v )
   {
     v = std::string(u);
   }
-  void from_variant( const fc::variant& v, url& u, uint32_t max_depth )
+  void from_variant( const fc::variant& v, url& u )
   {
     u  = url( v.as_string() ); 
   }
@@ -98,10 +100,11 @@ namespace fc
       if( my->_host.valid() ) ss<<*my->_host;
       if( my->_port.valid() ) ss<<":"<<*my->_port;
       if( my->_path.valid() ) ss<<my->_path->generic_string();
+    //  if( my->_args ) ss<<"?"<<*my->_args;
       return ss.str();
   }
 
-  url::url( const string& u )
+  url::url( const std::string& u )
   :my( std::make_shared<detail::url_impl>() )
   {
     my->parse(u);
@@ -121,7 +124,7 @@ namespace fc
   :my(u.my){}
 
   url::url( url&& u )
-  :my( std::move(u.my) )
+  :my( fc::move(u.my) )
   {
     u.my = get_null_url();
   }
@@ -132,7 +135,7 @@ namespace fc
 
   }
   url::url( mutable_url&& mu )
-  :my( std::move( mu.my ) )
+  :my( fc::move( mu.my ) )
   { }
 
   url::~url(){}
@@ -147,7 +150,7 @@ namespace fc
   {
      if( this != &u )
      {
-        my = std::move(u.my);
+        my = fc::move(u.my);
         u.my= get_null_url();
      }
      return *this;
@@ -159,7 +162,7 @@ namespace fc
   }
   url& url::operator=(mutable_url&& u )
   {
-     my = std::move(u.my);
+     my = fc::move(u.my);
      return *this;
   }
 

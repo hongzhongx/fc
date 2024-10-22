@@ -10,7 +10,7 @@ namespace fc { namespace ip {
   address::address( uint32_t ip )
   :_ip(ip){}
 
-  address::address( const std::string& s )
+  address::address( const std::string& s ) 
   {
     try
     {
@@ -25,8 +25,12 @@ namespace fc { namespace ip {
   bool operator!=( const address& a, const address& b ) {
     return uint32_t(a) != uint32_t(b);
   }
+  bool operator<( const address& a, const address& b ) {
+    return uint32_t(a) < uint32_t(b);
+  }
 
-  address& address::operator=( const std::string& s )
+
+  address& address::operator=( const std::string& s ) 
   {
     try
     {
@@ -36,13 +40,7 @@ namespace fc { namespace ip {
     return *this;
   }
 
-  address& address::operator=( uint32_t ip )
-  {
-    _ip = ip;
-    return *this;
-  }
-
-  address::operator std::string()const
+  address::operator std::string()const 
   {
     try
     {
@@ -55,10 +53,9 @@ namespace fc { namespace ip {
   }
 
 
+  endpoint::endpoint()
+  :_port(0){  }
   endpoint::endpoint(const address& a, uint16_t p)
-  :_port(p),_ip(a){}
-
-  endpoint::endpoint(uint32_t a, uint16_t p)
   :_port(p),_ip(a){}
 
   bool operator==( const endpoint& a, const endpoint& b ) {
@@ -91,7 +88,7 @@ namespace fc { namespace ip {
     FC_RETHROW_EXCEPTIONS(warn, "error converting string to IP endpoint")
   }
 
-  endpoint::operator string()const
+  endpoint::operator string()const 
   {
     try
     {
@@ -100,7 +97,7 @@ namespace fc { namespace ip {
     FC_RETHROW_EXCEPTIONS(warn, "error converting IP endpoint to string")
   }
 
-  /*
+  /**
    *  @return true if the ip is in the following ranges:
    *
    *  10.0.0.0    to 10.255.255.255
@@ -126,7 +123,7 @@ namespace fc { namespace ip {
     return false;
   }
 
-  /*
+  /**
    *  224.0.0.0 to 239.255.255.255
    */
   bool address::is_multicast_address()const
@@ -136,40 +133,30 @@ namespace fc { namespace ip {
     return  _ip >= min_ip._ip  && _ip <= max_ip._ip;
   }
 
-  /*
-   *  127.0.0.0 to 127.255.255.255
-   */
-  bool address::is_loopback_address()const
-  {
-    static address min_ip("127.0.0.0");
-    static address max_ip("127.255.255.255");
-    return  _ip >= min_ip._ip  && _ip <= max_ip._ip;
-  }
-
-  // not private, not loopback, and not multicast
+  /** !private & !multicast */
   bool address::is_public_address()const
   {
-    return !( is_private_address() || is_loopback_address() || is_multicast_address() );
+    return !( is_private_address() || is_multicast_address() );
   }
 
 }  // namespace ip
 
-  void to_variant( const ip::endpoint& var,  variant& vo, uint32_t max_depth )
+  void to_variant( const ip::endpoint& var,  variant& vo )
   {
       vo = std::string(var);
   }
-  void from_variant( const variant& var,  ip::endpoint& vo, uint32_t max_depth )
+  void from_variant( const variant& var,  ip::endpoint& vo )
   {
      vo = ip::endpoint::from_string(var.as_string());
   }
 
-  void to_variant( const ip::address& var,  variant& vo, uint32_t max_depth )
+  void to_variant( const ip::address& var,  variant& vo )
   {
     vo = std::string(var);
   }
-  void from_variant( const variant& var,  ip::address& vo, uint32_t max_depth )
+  void from_variant( const variant& var,  ip::address& vo )
   {
     vo = ip::address(var.as_string());
   }
 
-}
+} 

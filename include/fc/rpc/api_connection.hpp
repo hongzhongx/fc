@@ -2,12 +2,13 @@
 #include <fc/variant.hpp>
 #include <fc/optional.hpp>
 #include <fc/api.hpp>
-#include <boost/any.hpp>
+#include <fc/any.hpp>
 #include <memory>
 #include <vector>
 #include <functional>
 #include <utility>
 #include <fc/signals.hpp>
+//#include <fc/rpc/json_connection.hpp>
 
 namespace fc {
    class api_connection;
@@ -22,7 +23,7 @@ namespace fc {
             callback_functor( std::weak_ptr< fc::api_connection > con, uint64_t id )
             :_callback_id(id),_api_connection(con){}
 
-            template<typename... Args> 
+            template<typename... Args>
             result_type operator()( Args... args )const;
 
          private:
@@ -33,46 +34,34 @@ namespace fc {
       template<typename R, typename Arg0, typename ... Args>
       std::function<R(Args...)> bind_first_arg( const std::function<R(Arg0,Args...)>& f, Arg0 a0 )
       {
-         // Capture a0 this way because of a {compiler,fc,???} bug that causes optional<bool>() to be incorrectly
-         // captured as optional<bool>(false).
-         return [f, a0 = std::decay_t<Arg0>(a0)]( Args... args ) { return f( a0, args... ); };
+         return [=]( Args... args ) { return f( a0, args... ); };
       }
       template<typename R>
-      R call_generic( const std::function<R()>& f, variants::const_iterator a0, variants::const_iterator e, uint32_t max_depth = 1 )
+      R call_generic( const std::function<R()>& f, variants::const_iterator a0, variants::const_iterator e )
       {
          return f();
       }
 
       template<typename R, typename Arg0, typename ... Args>
-      R call_generic( const std::function<R(Arg0,Args...)>& f, variants::const_iterator a0,
-                      variants::const_iterator e, uint32_t max_depth )
+      R call_generic( const std::function<R(Arg0,Args...)>& f, variants::const_iterator a0, variants::const_iterator e )
       {
-         bool optional_args = all_optionals<std::decay_t<Arg0>, std::decay_t<Args>...>::value;
-         FC_ASSERT( a0 != e || optional_args );
-         FC_ASSERT( max_depth > 0, "Recursion depth exceeded!" );
-         if (a0==e)
-            return call_generic<R,Args...>( bind_first_arg<R,Arg0,Args...>( f, std::decay_t<Arg0>() ), a0,
-                                            e, max_depth - 1 );
-         auto arg = a0->as<std::decay_t<Arg0>>(max_depth - 1);
-         return call_generic<R,Args...>( bind_first_arg<R,Arg0,Args...>( f, std::move(arg) ), a0+1, e,
-                                         max_depth - 1 );
+         FC_ASSERT( a0 != e );
+         return  call_generic<R,Args...>( bind_first_arg<R,Arg0,Args...>( f, a0->as< typename std::decay<Arg0>::type >() ), a0+1, e );
       }
 
       template<typename R, typename ... Args>
-      std::function<variant(const fc::variants&, uint32_t)> to_generic( const std::function<R(Args...)>& f )
+      std::function<variant(const fc::variants&)> to_generic( const std::function<R(Args...)>& f )
       {
-         return [=]( const variants& args, uint32_t max_depth ) {
-            FC_ASSERT( max_depth > 0, "Recursion depth exceeded!" );
-            return variant( call_generic( f, args.begin(), args.end(), max_depth - 1 ), max_depth - 1 );
+         return [=]( const variants& args ) {
+            return variant( call_generic( f, args.begin(), args.end() ) );
          };
       }
 
       template<typename ... Args>
-      std::function<variant(const fc::variants&, uint32_t)> to_generic( const std::function<void(Args...)>& f )
+      std::function<variant(const fc::variants&)> to_generic( const std::function<void(Args...)>& f )
       {
-         return [=]( const variants& args, uint32_t max_depth ) {
-            FC_ASSERT( max_depth > 0, "Recursion depth exceeded!" );
-            call_generic( f, args.begin(), args.end(), max_depth - 1 );
+         return [=]( const variants& args ) {
+            call_generic( f, args.begin(), args.end() );
             return variant();
          };
       }
@@ -117,17 +106,13 @@ namespace fc {
          variant call( const string& name, const variants& args )
          {
             auto itr = _by_name.find(name);
-            if( itr == _by_name.end() )
-               FC_THROW_EXCEPTION( method_not_found_exception, "No method with name '${name}'",
-                                   ("name",name)("api",_by_name) );
+            FC_ASSERT( itr != _by_name.end(), "no method with name '${name}'", ("name",name)("api",_by_name) );
             return call( itr->second, args );
          }
 
          variant call( uint32_t method_id, const variants& args )
          {
-            if( method_id >= _methods.size() )
-               FC_THROW_EXCEPTION( method_not_found_exception, "No method with id '${id}'",
-                                   ("id",method_id)("api",_by_name) );
+            FC_ASSERT( method_id < _methods.size() );
             return _methods[method_id](args);
          }
 
@@ -150,53 +135,35 @@ namespace fc {
          template<typename R, typename Arg0, typename ... Args>
          std::function<R(Args...)> bind_first_arg( const std::function<R(Arg0,Args...)>& f, Arg0 a0 )const
          {
-            // Capture a0 this way because of a {compiler,fc,???} bug that causes optional<bool>() to be incorrectly
-            // captured as optional<bool>(false).
-            return [f, a0 = std::decay_t<Arg0>(a0)]( Args... args ) { return f( a0, args... ); };
+            return [=]( Args... args ) { return f( a0, args... ); };
          }
 
          template<typename R>
-         R call_generic( const std::function<R()>& f, variants::const_iterator a0, variants::const_iterator e, uint32_t max_depth = 1 )const
+         R call_generic( const std::function<R()>& f, variants::const_iterator a0, variants::const_iterator e )const
          {
             return f();
          }
 
-         template<typename R, typename Signature, typename ... Args, 
-               typename std::enable_if<std::is_function<Signature>::value,Signature>::type* = nullptr>
-         R call_generic( const std::function<R(std::function<Signature>,Args...)>& f, 
-               variants::const_iterator a0, variants::const_iterator e, uint32_t max_depth )
+         template<typename R, typename Signature, typename ... Args>
+         R call_generic( const std::function<R(std::function<Signature>,Args...)>& f, variants::const_iterator a0, variants::const_iterator e )
          {
             FC_ASSERT( a0 != e, "too few arguments passed to method" );
-            FC_ASSERT( max_depth > 0, "Recursion depth exceeded!" );
-            detail::callback_functor<Signature> arg0( get_connection(), a0->as<uint64_t>(1) );
-            return call_generic<R,Args...>( this->bind_first_arg<R,std::function<Signature>,Args...>( f, 
-                  std::function<Signature>(arg0) ), a0+1, e, max_depth - 1 );
+            detail::callback_functor<Signature> arg0( get_connection(), a0->as<uint64_t>() );
+            return  call_generic<R,Args...>( this->bind_first_arg<R,std::function<Signature>,Args...>( f, std::function<Signature>(arg0) ), a0+1, e );
          }
-         template<typename R, typename Signature, typename ... Args, 
-               typename std::enable_if<std::is_function<Signature>::value,Signature>::type* = nullptr>
-         R call_generic( const std::function<R(const std::function<Signature>&,Args...)>& f, 
-               variants::const_iterator a0, variants::const_iterator e, uint32_t max_depth )
+         template<typename R, typename Signature, typename ... Args>
+         R call_generic( const std::function<R(const std::function<Signature>&,Args...)>& f, variants::const_iterator a0, variants::const_iterator e )
          {
             FC_ASSERT( a0 != e, "too few arguments passed to method" );
-            FC_ASSERT( max_depth > 0, "Recursion depth exceeded!" );
-            detail::callback_functor<Signature> arg0( get_connection(), a0->as<uint64_t>(1) );
-            return call_generic<R,Args...>( this->bind_first_arg<R,const std::function<Signature>&,Args...>( f, 
-                  arg0 ), a0+1, e, max_depth - 1 );
+            detail::callback_functor<Signature> arg0( get_connection(), a0->as<uint64_t>() );
+            return  call_generic<R,Args...>( this->bind_first_arg<R,const std::function<Signature>&,Args...>( f, arg0 ), a0+1, e );
          }
 
          template<typename R, typename Arg0, typename ... Args>
-         R call_generic( const std::function<R(Arg0,Args...)>& f, variants::const_iterator a0,
-                         variants::const_iterator e, uint32_t max_depth )
+         R call_generic( const std::function<R(Arg0,Args...)>& f, variants::const_iterator a0, variants::const_iterator e )
          {
-            bool optional_args = detail::all_optionals<std::decay_t<Arg0>, std::decay_t<Args>...>::value;
-            FC_ASSERT( a0 != e || optional_args, "too few arguments passed to method" );
-            FC_ASSERT( max_depth > 0, "Recursion depth exceeded!" );
-            if (a0==e)
-               return call_generic<R,Args...>( this->bind_first_arg<R,Arg0,Args...>( f, std::decay_t<Arg0>() ), a0,
-                                               e, max_depth - 1 );
-            auto arg = a0->as<std::decay_t<Arg0>>(max_depth - 1);
-            return call_generic<R,Args...>( this->bind_first_arg<R,Arg0,Args...>( f, std::move(arg) ), a0+1, e,
-                                            max_depth - 1 );
+            FC_ASSERT( a0 != e, "too few arguments passed to method" );
+            return  call_generic<R,Args...>( this->bind_first_arg<R,Arg0,Args...>( f, a0->as< typename std::decay<Arg0>::type >() ), a0+1, e );
          }
 
          struct api_visitor
@@ -230,7 +197,7 @@ namespace fc {
 
 
          std::weak_ptr<fc::api_connection>                       _api_connection;
-         boost::any                                              _api;
+         fc::any                                                 _api;
          std::map< std::string, uint32_t >                       _by_name;
          std::vector< std::function<variant(const variants&)> >  _methods;
    }; // class generic_api
@@ -240,20 +207,24 @@ namespace fc {
    class api_connection : public std::enable_shared_from_this<fc::api_connection>
    {
       public:
-         api_connection(uint32_t max_depth):_max_conversion_depth(max_depth){}
+         api_connection(){}
          virtual ~api_connection(){};
 
 
          template<typename T>
-         api<T> get_remote_api( api_id_type api_id = 0 )
+         api<T> get_remote_api( api_id_type api_id = 0, string api_name = "" )
          {
             api<T> result;
-            result->visit( api_visitor(  api_id, this->shared_from_this() ) );
+            if( api_name.size() )
+               result->visit( api_visitor( api_id, api_name, this->shared_from_this() ) );
+            else
+               result->visit( api_visitor( api_id, this->shared_from_this() ) );
             return result;
          }
-  
+
          /** makes calls to the remote server */
          virtual variant send_call( api_id_type api_id, string method_name, variants args = variants() ) = 0;
+         virtual variant send_call( string api_name, string method_name, variants args = variants() ) = 0;
          virtual variant send_callback( uint64_t callback_id, variants args = variants() ) = 0;
          virtual void    send_notice( uint64_t callback_id, variants args = variants() ) = 0;
 
@@ -265,12 +236,12 @@ namespace fc {
          variant receive_callback( uint64_t callback_id,  const variants& args = variants() )const
          {
             FC_ASSERT( _local_callbacks.size() > callback_id );
-            return _local_callbacks[callback_id]( args, _max_conversion_depth );
+            return _local_callbacks[callback_id]( args );
          }
          void receive_notice( uint64_t callback_id,  const variants& args = variants() )const
          {
             FC_ASSERT( _local_callbacks.size() > callback_id );
-            _local_callbacks[callback_id]( args, _max_conversion_depth );
+            _local_callbacks[callback_id]( args );
          }
 
          template<typename Interface>
@@ -295,16 +266,16 @@ namespace fc {
          std::vector<std::string> get_method_names( api_id_type local_api_id = 0 )const { return _local_apis[local_api_id]->get_method_names(); }
 
          fc::signal<void()> closed;
-         const uint32_t     _max_conversion_depth; // for nested structures, json, variant etc.
       private:
-         std::vector< std::unique_ptr<generic_api> >                      _local_apis;
-         std::map< uint64_t, api_id_type >                                _handle_to_id;
-         std::vector< std::function<variant(const variants&, uint32_t)> > _local_callbacks;
+         std::vector< std::unique_ptr<generic_api> >             _local_apis;
+         std::map< uint64_t, api_id_type >                       _handle_to_id;
+         std::vector< std::function<variant(const variants&)>  > _local_callbacks;
 
 
          struct api_visitor
          {
             uint32_t                            _api_id;
+            optional< string >                  _api_name;
             std::shared_ptr<fc::api_connection> _connection;
 
             api_visitor( uint32_t api_id, std::shared_ptr<fc::api_connection> con )
@@ -312,19 +283,21 @@ namespace fc {
             {
             }
 
+            api_visitor( uint32_t api_id, string& api_name, std::shared_ptr<fc::api_connection> con )
+            : _api_id(api_id), _api_name(api_name), _connection(std::move(con)) {}
+
             api_visitor() = delete;
 
             template<typename Result>
-            static Result from_variant( const variant& v, Result*, const std::shared_ptr<fc::api_connection>&, uint32_t max_depth )
+            static Result from_variant( const variant& v, Result*, const std::shared_ptr<fc::api_connection>&  )
             {
-               return v.as<Result>( max_depth );
+               return v.as<Result>();
             }
 
             template<typename ResultInterface>
-            static fc::api<ResultInterface> from_variant( const variant& v, 
+            static fc::api<ResultInterface> from_variant( const variant& v,
                                                           fc::api<ResultInterface>* /*used for template deduction*/,
-                                                          const std::shared_ptr<fc::api_connection>&  con,
-                                                          uint32_t max_depth = 1
+                                                          const std::shared_ptr<fc::api_connection>&  con
                                                         )
             {
                return con->get_remote_api<ResultInterface>( v.as_uint64() );
@@ -333,8 +306,7 @@ namespace fc {
             static fc::api_ptr from_variant(
                const variant& v,
                fc::api_ptr* /* used for template deduction */,
-               const std::shared_ptr<fc::api_connection>&  con,
-               uint32_t max_depth = 1
+               const std::shared_ptr<fc::api_connection>&  con
             )
             {
                if( v.is_null() )
@@ -343,34 +315,43 @@ namespace fc {
             }
 
             template<typename T>
-            static fc::variant convert_callbacks( const std::shared_ptr<fc::api_connection>& con, const T& v )
-            { 
-               return fc::variant( v, con->_max_conversion_depth );
+            static fc::variant convert_callbacks( const std::shared_ptr<fc::api_connection>&, const T& v )
+            {
+               return fc::variant(v);
             }
 
             template<typename Signature>
-            static fc::variant convert_callbacks( const std::shared_ptr<fc::api_connection>& con, const std::function<Signature>& v ) 
-            { 
-               return con->register_callback( v ); 
+            static fc::variant convert_callbacks( const std::shared_ptr<fc::api_connection>& con, const std::function<Signature>& v )
+            {
+               return con->register_callback( v );
             }
 
             template<typename Result, typename... Args>
-            void operator()( const char* name, std::function<Result(Args...)>& memb )const 
+            void operator()( const char* name, std::function<Result(Args...)>& memb )const
             {
                 auto con   = _connection;
                 auto api_id = _api_id;
-                memb = [con,api_id,name]( Args... args ) {
-                    auto var_result = con->send_call( api_id, name, { convert_callbacks(con,args)...} );
-                    return from_variant( var_result, (Result*)nullptr, con, con->_max_conversion_depth );
+                auto api_name = _api_name;
+                memb = [con,api_id,name,api_name]( Args... args ) {
+                    variant var_result;
+                    if( api_name )
+                      var_result = con->send_call( *api_name, name, { convert_callbacks(con,args)...} );
+                    else
+                      var_result = con->send_call( api_id, name, { convert_callbacks(con,args)...} );
+                    return from_variant( var_result, (Result*)nullptr, con );
                 };
             }
             template<typename... Args>
-            void operator()( const char* name, std::function<void(Args...)>& memb )const 
+            void operator()( const char* name, std::function<void(Args...)>& memb )const
             {
                 auto con   = _connection;
                 auto api_id = _api_id;
-                memb = [con,api_id,name]( Args... args ) {
-                   con->send_call( api_id, name, { convert_callbacks(con,args)...} );
+                auto api_name = _api_name;
+                memb = [con,api_id,name,api_name]( Args... args ) {
+                   if( api_name )
+                      con->send_call( *api_name, name, { convert_callbacks(con,args)...} );
+                    else
+                      con->send_call( api_id, name, { convert_callbacks(con,args)...} );
                 };
             }
          };
@@ -379,14 +360,16 @@ namespace fc {
    class local_api_connection : public api_connection
    {
       public:
-         local_api_connection( uint32_t max_depth ) : api_connection(max_depth){}
-         ~local_api_connection(){}
-
          /** makes calls to the remote server */
          virtual variant send_call( api_id_type api_id, string method_name, variants args = variants() ) override
          {
             FC_ASSERT( _remote_connection );
             return _remote_connection->receive_call( api_id, method_name, std::move(args) );
+         }
+         virtual variant send_call( string api_name, string method_name, variants args = variants() ) override
+         {
+            FC_ASSERT( false, "local call by name not supported" );
+            return variant();
          }
          virtual variant send_callback( uint64_t callback_id, variants args = variants() ) override
          {
@@ -419,30 +402,30 @@ namespace fc {
    }
 
    template<typename Interface, typename Adaptor, typename ... Args>
-   std::function<variant(const fc::variants&)> generic_api::api_visitor::to_generic( 
+   std::function<variant(const fc::variants&)> generic_api::api_visitor::to_generic(
                                                const std::function<fc::api<Interface,Adaptor>(Args...)>& f )const
    {
       auto api_con = _api_con;
       auto gapi = &_api;
-      return [=]( const variants& args ) { 
+      return [=]( const variants& args ) {
          auto con = api_con.lock();
          FC_ASSERT( con, "not connected" );
 
-         auto api_result = gapi->call_generic( f, args.begin(), args.end(), con->_max_conversion_depth );
+         auto api_result = gapi->call_generic( f, args.begin(), args.end() );
          return con->register_api( api_result );
       };
    }
    template<typename Interface, typename Adaptor, typename ... Args>
-   std::function<variant(const fc::variants&)> generic_api::api_visitor::to_generic( 
+   std::function<variant(const fc::variants&)> generic_api::api_visitor::to_generic(
                                                const std::function<fc::optional<fc::api<Interface,Adaptor>>(Args...)>& f )const
    {
       auto api_con = _api_con;
       auto gapi = &_api;
-      return [=]( const variants& args )-> fc::variant { 
+      return [=]( const variants& args )-> fc::variant {
          auto con = api_con.lock();
          FC_ASSERT( con, "not connected" );
 
-         auto api_result = gapi->call_generic( f, args.begin(), args.end(), con->_max_conversion_depth );
+         auto api_result = gapi->call_generic( f, args.begin(), args.end() );
          if( api_result )
             return con->register_api( *api_result );
          return variant();
@@ -459,7 +442,7 @@ namespace fc {
          auto con = api_con.lock();
          FC_ASSERT( con, "not connected" );
 
-         auto api_result = gapi->call_generic( f, args.begin(), args.end(), con->_max_conversion_depth );
+         auto api_result = gapi->call_generic( f, args.begin(), args.end() );
          if( !api_result )
             return variant();
          return api_result->register_api( *con );
@@ -469,24 +452,18 @@ namespace fc {
    template<typename R, typename ... Args>
    std::function<variant(const fc::variants&)> generic_api::api_visitor::to_generic( const std::function<R(Args...)>& f )const
    {
-      auto con = _api_con.lock();
-      FC_ASSERT( con, "not connected" );
-      uint32_t max_depth = con->_max_conversion_depth;
       generic_api* gapi = &_api;
-      return [f,gapi,max_depth]( const variants& args ) {
-         return variant( gapi->call_generic( f, args.begin(), args.end(), max_depth ), max_depth );
+      return [f,gapi]( const variants& args ) {
+         return variant( gapi->call_generic( f, args.begin(), args.end() ) );
       };
    }
 
    template<typename ... Args>
    std::function<variant(const fc::variants&)> generic_api::api_visitor::to_generic( const std::function<void(Args...)>& f )const
    {
-      auto con = _api_con.lock();
-      FC_ASSERT( con, "not connected" );
-      uint32_t max_depth = con->_max_conversion_depth;
       generic_api* gapi = &_api;
-      return [f,gapi,max_depth]( const variants& args ) {
-         gapi->call_generic( f, args.begin(), args.end(), max_depth );
+      return [f,gapi]( const variants& args ) {
+         gapi->call_generic( f, args.begin(), args.end() );
          return variant();
       };
    }
@@ -527,7 +504,7 @@ namespace fc {
 
    namespace detail {
       template<typename Signature>
-      template<typename... Args> 
+      template<typename... Args>
       typename callback_functor<Signature>::result_type callback_functor<Signature>::operator()( Args... args )const
       {
          std::shared_ptr< fc::api_connection > locked = _api_connection.lock();

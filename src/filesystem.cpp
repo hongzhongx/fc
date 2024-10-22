@@ -2,6 +2,7 @@
 #include <fc/filesystem.hpp>
 #include <fc/exception/exception.hpp>
 #include <fc/fwd_impl.hpp>
+#include <fc/utility.hpp>
 #include <fc/io/fstream.hpp>
 
 #include <fc/utf8.hpp>
@@ -26,15 +27,19 @@
 
 namespace fc {
   // when converting to and from a variant, store utf-8 in the variant
-  void to_variant( const fc::path& path_to_convert, variant& variant_output, uint32_t max_depth )
+  void to_variant( const fc::path& path_to_convert, variant& variant_output ) 
   {
     std::wstring wide_string = path_to_convert.generic_wstring();
     std::string utf8_string;
     fc::encodeUtf8(wide_string, &utf8_string);
     variant_output = utf8_string;
+
+    //std::string path = t.to_native_ansi_path();
+    //std::replace(path.begin(), path.end(), '\\', '/');
+    //v = path;
   }
 
-  void from_variant( const fc::variant& variant_to_convert, fc::path& path_output, uint32_t max_depth )
+  void from_variant( const fc::variant& variant_to_convert, fc::path& path_output ) 
   {
     std::wstring wide_string;
     fc::decodeUtf8(variant_to_convert.as_string(), &wide_string);
@@ -68,7 +73,7 @@ namespace fc {
     return *this;
    }
    path& path::operator =( path&& p ) {
-    *_p = std::move( *p._p );
+    *_p = fc::move( *p._p );
     return *this;
    }
 
@@ -196,7 +201,7 @@ namespace fc {
       recursive_directory_iterator& recursive_directory_iterator::operator++()     { (*_p)++; return *this; }
 
       void recursive_directory_iterator::pop() { (*_p).pop(); }
-      int recursive_directory_iterator::level() { return _p->depth(); }
+      int recursive_directory_iterator::level() { return _p->level(); }
 
       bool operator==( const recursive_directory_iterator& r, const recursive_directory_iterator& l) {
         return *r._p == *l._p;
@@ -240,16 +245,10 @@ namespace fc {
   void remove_all( const path& p ) { boost::filesystem::remove_all(p); }
   void copy( const path& f, const path& t ) { 
      try {
-         boost::system::error_code ec;
-         boost::filesystem::copy( boost::filesystem::path(f), boost::filesystem::path(t), ec );
-         if( ec )
-         {
-            FC_THROW( "Copy from ${srcfile} to ${dstfile} failed because ${code} : ${message}",
-                      ("srcfile",f)("dstfile",t)("code",ec.value())("message",ec.message()) );
-         }
+  	    boost::filesystem::copy( boost::filesystem::path(f), boost::filesystem::path(t) ); 
      } catch ( boost::system::system_error& e ) {
      	FC_THROW( "Copy from ${srcfile} to ${dstfile} failed because ${reason}",
-	         ("srcfile",f)("dstfile",t)("reason",std::string(e.what()) ) );
+	         ("srcfile",f)("dstfile",t)("reason",e.what() ) );
      } catch ( ... ) {
      	FC_THROW( "Copy from ${srcfile} to ${dstfile} failed",
 	         ("srcfile",f)("dstfile",t)("inner", fc::except_str() ) );
@@ -263,7 +262,7 @@ namespace fc {
     catch ( boost::system::system_error& e )
     {
       FC_THROW( "Resize file '${f}' to size ${s} failed: ${reason}",
-                ("f",f)("s",t)( "reason", std::string(e.what()) ) );
+                ("f",f)("s",t)( "reason", e.what() ) );
     } 
     catch ( ... ) 
     {
@@ -302,14 +301,13 @@ namespace fc {
   void rename( const path& f, const path& t ) { 
      try {
   	    boost::filesystem::rename( boost::filesystem::path(f), boost::filesystem::path(t) ); 
-     } catch ( boost::system::system_error& er ) {
-         try {
-            copy( f, t );
-            remove( f );
-         } catch ( fc::exception& e ) {
-             FC_RETHROW_EXCEPTION( e, error,
-                   "Rename from ${srcfile} to ${dstfile} failed due to ${reason}, trying to copy then remove",
-                   ("srcfile",f)("dstfile",t)("reason",std::string(er.what())) );
+     } catch ( boost::system::system_error& ) {
+         try{
+             boost::filesystem::copy( boost::filesystem::path(f), boost::filesystem::path(t) ); 
+             boost::filesystem::remove( boost::filesystem::path(f)); 
+         } catch ( boost::system::system_error& e ) {
+             FC_THROW( "Rename from ${srcfile} to ${dstfile} failed because ${reason}",
+                     ("srcfile",f)("dstfile",t)("reason",e.what() ) );
          }
      } catch ( ... ) {
      	FC_THROW( "Rename from ${srcfile} to ${dstfile} failed",
@@ -370,7 +368,7 @@ namespace fc {
       }
       if (create)
       {
-         fc::ofstream ofs(*_path, std::ios_base::out | std::ios_base::binary);
+         fc::ofstream ofs(*_path, fc::ofstream::out | fc::ofstream::binary);
          ofs.close();
       }
    }
@@ -500,5 +498,102 @@ namespace fc {
      static fc::path appCurrentPath = boost::filesystem::current_path();
      return appCurrentPath;
    }
+
+
+#ifdef FC_HAS_SIMPLE_FILE_LOCK  
+  class simple_lock_file::impl
+  {
+  public:
+#ifdef _WIN32
+    HANDLE file_handle;
+#else
+    int file_handle;
+#endif
+    bool is_locked;
+    path lock_file_path;
+
+    impl(const path& lock_file_path);
+    ~impl();
+
+    bool try_lock();
+    void unlock();
+  };
+  
+  simple_lock_file::impl::impl(const path& lock_file_path) :
+#ifdef _WIN32
+    file_handle(INVALID_HANDLE_VALUE),
+#else
+    file_handle(-1),
+#endif
+    is_locked(false),
+    lock_file_path(lock_file_path)
+  {}
+   
+  simple_lock_file::impl::~impl()
+  {
+    unlock();
+  }
+
+  bool simple_lock_file::impl::try_lock()
+  {
+#ifdef _WIN32
+    HANDLE fh = CreateFileA(lock_file_path.to_native_ansi_path().c_str(),
+                            GENERIC_READ | GENERIC_WRITE,
+                            0, 0,
+                            OPEN_ALWAYS, 0, NULL);
+    if (fh == INVALID_HANDLE_VALUE)
+      return false;
+    is_locked = true;
+    file_handle = fh;
+    return true;
+#else
+    int fd = open(lock_file_path.string().c_str(), O_RDWR|O_CREAT, 0644);
+    if (fd < 0)
+      return false;
+    if (flock(fd, LOCK_EX|LOCK_NB) == -1)
+    {
+      close(fd);
+      return false;
+    }
+    is_locked = true;
+    file_handle = fd;
+    return true;
+#endif
+  }
+
+  void simple_lock_file::impl::unlock()
+  {
+#ifdef WIN32
+    CloseHandle(file_handle);
+    file_handle = INVALID_HANDLE_VALUE;
+    is_locked = false;
+#else
+    flock(file_handle, LOCK_UN);
+    close(file_handle);
+    file_handle = -1;
+    is_locked = false;
+#endif
+  }
+
+
+  simple_lock_file::simple_lock_file(const path& lock_file_path) :
+    my(new impl(lock_file_path))
+  {
+  }
+
+  simple_lock_file::~simple_lock_file()
+  {
+  }
+
+  bool simple_lock_file::try_lock()
+  {
+    return my->try_lock();
+  }
+
+  void simple_lock_file::unlock()
+  {
+    my->unlock();
+  }
+#endif // FC_HAS_SIMPLE_FILE_LOCK
 
 }

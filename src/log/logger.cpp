@@ -11,7 +11,7 @@
 
 namespace fc {
 
-    class logger::impl {
+    class logger::impl : public fc::retainable {
       public:
          impl()
          :_parent(nullptr),_enabled(true),_additivity(false),_level(log_level::warn){}
@@ -28,7 +28,7 @@ namespace fc {
     logger::logger()
     :my( new impl() ){}
 
-    logger::logger(std::nullptr_t){}
+    logger::logger(nullptr_t){}
 
     logger::logger( const string& name, const logger& parent )
     :my( new impl() )
@@ -42,7 +42,7 @@ namespace fc {
     :my(l.my){}
 
     logger::logger( logger&& l )
-    :my(std::move(l.my)){}
+    :my(fc::move(l.my)){}
 
     logger::~logger(){}
 
@@ -51,11 +51,11 @@ namespace fc {
        return *this;
     }
     logger& logger::operator=( logger&& l ){
-       std::swap(my,l.my);
+       fc_swap(my,l.my);
        return *this;
     }
-    bool operator==( const logger& l, std::nullptr_t ) { return !(bool)l.my; }
-    bool operator!=( const logger& l, std::nullptr_t ) { return (bool)l.my;  }
+    bool operator==( const logger& l, std::nullptr_t ) { return !l.my; }
+    bool operator!=( const logger& l, std::nullptr_t ) { return l.my;  }
 
     bool logger::is_enabled( log_level e )const {
        return e >= my->_level;
@@ -96,17 +96,13 @@ namespace fc {
     log_level logger::get_log_level()const { return my->_level; }
     logger& logger::set_log_level(log_level ll) { my->_level = ll; return *this; }
 
-    void logger::add_appender( const appender::ptr& a )
+    void logger::add_appender( const fc::shared_ptr<appender>& a )
     { my->_appenders.push_back(a); }
     
-    void logger::remove_appender( const appender::ptr& a )
-    { 
-      auto item = std::find(my->_appenders.begin(), my->_appenders.end(), a);
-      if (item != my->_appenders.end())
-         my->_appenders.erase(item); 
-    }
+//    void logger::remove_appender( const fc::shared_ptr<appender>& a )
+ //   { my->_appenders.erase(a); }
 
-    std::vector<appender::ptr> logger::get_appenders()const
+    std::vector<fc::shared_ptr<appender> > logger::get_appenders()const
     {
         return my->_appenders;
     }

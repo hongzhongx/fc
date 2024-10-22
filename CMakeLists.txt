@@ -1,8 +1,20 @@
 #
 # Defines fc library target.
 
-CMAKE_MINIMUM_REQUIRED( VERSION 3.5 FATAL_ERROR )
+CMAKE_MINIMUM_REQUIRED( VERSION 3.8 FATAL_ERROR )
 PROJECT( fc )
+
+# CMP0114: ExternalProject step targets fully adopt their steps.
+# New in CMake 3.19: https://cmake.org/cmake/help/latest/policy/CMP0114.html
+if(POLICY CMP0114)
+  cmake_policy(SET CMP0114 NEW)
+endif()
+
+# CMP0167: The FindBoost module is removed.
+# New in CMake 3.30. https://cmake.org/cmake/help/latest/policy/CMP0167.html
+if(POLICY CMP0167)
+  cmake_policy(SET CMP0167 OLD)
+endif()
 
 set( CMAKE_CXX_STANDARD 14 )
 SET( CMAKE_CXX_STANDARD_REQUIRED ON )
@@ -21,25 +33,34 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/GitVersionGen")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules")
 
 INCLUDE(GetPrerequisites)
+INCLUDE( VersionMacros )
+INCLUDE( SetupTargetMacros )
 INCLUDE(GetGitRevisionDescription)
 INCLUDE(CheckLibraryExists)
 
 get_git_head_revision(GIT_REFSPEC FC_GIT_REVISION_SHA)
 get_git_unix_timestamp(FC_GIT_REVISION_UNIX_TIMESTAMP)
 
+if(FC_GIT_REVISION_UNIX_TIMESTAMP MATCHES "HEAD-HASH-NOTFOUND")
+  SET(FC_GIT_REVISION_UNIX_TIMESTAMP 0)
+endif()
+
 SET( DEFAULT_HEADER_INSTALL_DIR include/\${target} )
 SET( DEFAULT_LIBRARY_INSTALL_DIR lib/ )
 SET( DEFAULT_EXECUTABLE_INSTALL_DIR bin/ )
 SET( CMAKE_DEBUG_POSTFIX _debug )
 SET( BUILD_SHARED_LIBS NO )
+SET( ECC_IMPL secp256k1 CACHE STRING "secp256k1 or openssl or mixed" )
 
 set(platformBitness 32)
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
   set(platformBitness 64)
 endif()
 
+SET (ORIGINAL_LIB_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
+
 SET(BOOST_COMPONENTS)
-LIST(APPEND BOOST_COMPONENTS coroutine thread date_time filesystem system program_options chrono unit_test_framework context iostreams regex)
+LIST(APPEND BOOST_COMPONENTS coroutine thread date_time filesystem system program_options serialization chrono unit_test_framework context locale iostreams regex)
 # boost::endian is also required, but FindBoost can't handle header-only libs
 SET( Boost_USE_STATIC_LIBS ON CACHE STRING "ON or OFF" )
 
@@ -56,6 +77,17 @@ IF(APPLE)
 	link_directories(${HOMEBREW_PREFIX}/lib)
 	link_directories(${HOMEBREW_PREFIX}/opt/icu4c/lib)
 ENDIF()
+
+IF( ECC_IMPL STREQUAL openssl )
+  SET( ECC_REST src/crypto/elliptic_impl_pub.cpp )
+ELSE( ECC_IMPL STREQUAL openssl )
+  SET( ECC_LIB secp256k1 )
+  IF( ECC_IMPL STREQUAL mixed )
+    SET( ECC_REST src/crypto/elliptic_impl_priv.cpp src/crypto/elliptic_impl_pub.cpp )
+  ELSE( ECC_IMPL STREQUAL mixed )
+    SET( ECC_REST src/crypto/elliptic_impl_priv.cpp )
+  ENDIF( ECC_IMPL STREQUAL mixed )
+ENDIF( ECC_IMPL STREQUAL openssl )
 
 # Configure secp256k1-zkp
 if ( WIN32 )
@@ -76,7 +108,16 @@ if ( WIN32 )
     set_target_properties( secp256k1 PROPERTIES COMPILE_DEFINITIONS "${SECP256K1_BUILD_DEFINES}" LINKER_LANGUAGE C )
 else ( WIN32 )
     include(ExternalProject)
-
+    if ( MINGW )
+    ExternalProject_Add( project_secp256k1
+     PREFIX ${CMAKE_CURRENT_BINARY_DIR}/vendor/secp256k1-zkp
+     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendor/secp256k1-zkp
+     CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/vendor/secp256k1-zkp/configure --prefix=${CMAKE_CURRENT_BINARY_DIR}/vendor/secp256k1-zkp --with-bignum=no  --host=x86_64-w64-mingw32
+     BUILD_COMMAND make
+     INSTALL_COMMAND true
+     BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/vendor/secp256k1-zkp/src/project_secp256k1-build/.libs/libsecp256k1.a
+    )
+    else ( MINGW )
     ExternalProject_Add( project_secp256k1
      PREFIX ${CMAKE_CURRENT_BINARY_DIR}/vendor/secp256k1-zkp
      SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendor/secp256k1-zkp
@@ -85,7 +126,7 @@ else ( WIN32 )
      INSTALL_COMMAND true
      BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/vendor/secp256k1-zkp/src/project_secp256k1-build/.libs/libsecp256k1.a
     )
-
+    endif ( MINGW )
     ExternalProject_Add_Step(project_secp256k1 autogen
      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/vendor/secp256k1-zkp
      COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/vendor/secp256k1-zkp/autogen.sh
@@ -145,21 +186,30 @@ IF( WIN32 )
 
   LIST(APPEND PLATFORM_SPECIFIC_LIBS ws2_32 crypt32 mswsock userenv)
 
+  set( PLATFORM_SPECIFIC_LIBS wsock32.lib ws2_32.lib userenv.lib)
   # iphlpapi.lib
+
+ELSE(WIN32)
+  MESSAGE(STATUS "Configuring fc to build on Unix/Apple")
+
+  SET(CMAKE_FIND_LIBRARY_SUFFIXES ".a;.so")
+
+  IF(NOT APPLE)
+    # Linux or other unix
+    SET(rt_library rt )
+    SET(pthread_library pthread)
+  ENDIF(NOT APPLE)
 ENDIF(WIN32)
 
 set(Boost_DIR "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules/Boost")
 FIND_PACKAGE(Boost CONFIG COMPONENTS ${BOOST_COMPONENTS} )
 
-IF(NOT WIN32)
-  MESSAGE(STATUS "Configuring fc to build on Unix/Apple")
+if( NOT( Boost_VERSION LESS 106900 ) )
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility=hidden")
+  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fvisibility=hidden")
+endif()
 
-  IF(NOT APPLE AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "OpenBSD")
-    SET(rt_library rt )
-  ENDIF(NOT APPLE AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "OpenBSD")
-ENDIF(NOT WIN32)
-
-IF($ENV{OPENSSL_ROOT_DIR})
+IF(NOT "$ENV{OPENSSL_ROOT_DIR}" STREQUAL "")
   set(OPENSSL_ROOT_DIR $ENV{OPENSSL_ROOT_DIR} )
   set(OPENSSL_INCLUDE_DIR ${OPENSSL_ROOT_DIR}/include)
   message(STATUS "Setting up OpenSSL root and include vars to ${OPENSSL_ROOT_DIR}, ${OPENSSL_INCLUDE_DIR}")
@@ -171,12 +221,16 @@ ENDIF( LIBCXX_HAVE_CXX_ATOMICS_WITH_LIB )
 
 find_package(OpenSSL REQUIRED)
 
+set( CMAKE_FIND_LIBRARY_SUFFIXES ${ORIGINAL_LIB_SUFFIXES} )
+
+option( UNITY_BUILD OFF )
+
 set( fc_sources
-     src/popcount.cpp
+     src/uint128.cpp
+     src/real128.cpp
      src/variant.cpp
      src/exception.cpp
      src/variant_object.cpp
-     src/static_variant.cpp
      src/thread/thread.cpp
      src/thread/thread_specific.cpp
      src/thread/future.cpp
@@ -184,11 +238,11 @@ set( fc_sources
      src/thread/spin_lock.cpp
      src/thread/spin_yield_lock.cpp
      src/thread/mutex.cpp
-     src/thread/parallel.cpp
      src/thread/non_preemptable_scope_check.cpp
      src/asio.cpp
-     src/string.cpp
      src/stacktrace.cpp
+     src/string.cpp
+     src/shared_ptr.cpp
      src/time.cpp
      src/utf8.cpp
      src/io/iostream.cpp
@@ -198,11 +252,17 @@ set( fc_sources
      src/io/sstream.cpp
      src/io/json.cpp
      src/io/varint.cpp
+     src/io/console.cpp
      src/filesystem.cpp
      src/interprocess/signals.cpp
      src/interprocess/file_mapping.cpp
+     src/interprocess/mmap_struct.cpp
+     src/interprocess/file_mutex.cpp
      src/rpc/cli.cpp
+     src/rpc/http_api.cpp
+     src/rpc/json_connection.cpp
      src/rpc/state.cpp
+     src/rpc/bstate.cpp
      src/rpc/websocket_api.cpp
      src/log/log_message.cpp
      src/log/logger.cpp
@@ -216,30 +276,39 @@ set( fc_sources
      src/crypto/aes.cpp
      src/crypto/crc.cpp
      src/crypto/city.cpp
+     src/crypto/base32.cpp
+     src/crypto/base36.cpp
      src/crypto/base58.cpp
      src/crypto/base64.cpp
      src/crypto/bigint.cpp
      src/crypto/hex.cpp
      src/crypto/sha1.cpp
      src/crypto/ripemd160.cpp
-     src/crypto/hash160.cpp
      src/crypto/sha256.cpp
      src/crypto/sha224.cpp
      src/crypto/sha512.cpp
-     src/crypto/dh.cpp
+     src/crypto/blowfish.cpp
      src/crypto/elliptic_common.cpp
-     src/crypto/elliptic_impl_priv.cpp
-     src/crypto/elliptic_secp256k1.cpp
+     src/crypto/equihash.cpp
+     src/crypto/restartable_sha256.cpp
+     ${ECC_REST}
+     src/crypto/elliptic_${ECC_IMPL}.cpp
      src/crypto/rand.cpp
      src/network/tcp_socket.cpp
      src/network/udp_socket.cpp
      src/network/http/http_connection.cpp
+     src/network/http/http_server.cpp
      src/network/http/websocket.cpp
+     src/network/ntp.cpp
      src/network/ip.cpp
      src/network/rate_limiting.cpp
      src/network/resolve.cpp
      src/network/url.cpp
+     src/network/gntp.cpp
      src/compress/zlib.cpp
+     src/reflect/typename.cpp
+     vendor/cyoencode-1.0.2/src/CyoDecode.c
+     vendor/cyoencode-1.0.2/src/CyoEncode.c
      )
 
 file( GLOB_RECURSE fc_headers ${CMAKE_CURRENT_SOURCE_DIR} *.hpp *.h )
@@ -253,9 +322,9 @@ list(APPEND sources "${CMAKE_CURRENT_BINARY_DIR}/git_revision.cpp")
 list(APPEND sources ${fc_headers})
 
 add_subdirectory( vendor/websocketpp EXCLUDE_FROM_ALL )
+add_subdirectory( vendor/equihash )
 
-add_library( fc ${sources} )
-install( DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/" DESTINATION include )
+setup_library( fc SOURCES ${sources} LIBRARY_TYPE STATIC DONT_INSTALL_LIBRARY )
 
 # begin editline stuff
 if(WIN32)
@@ -265,6 +334,10 @@ else(WIN32)
   set( editline_libraries editline )
 endif(WIN32)
 # end editline stuff
+
+if( NOT CPP_STANDARD )
+  set( CPP_STANDARD, "-std=c++11" )
+endif()
 
 IF(WIN32)
   target_compile_definitions(fc PUBLIC WIN32 NOMINMAX _WIN32_WINNT=0x0501 _CRT_SECURE_NO_WARNINGS
@@ -284,15 +357,15 @@ IF(WIN32)
      # Put MinGW specific compiler settings here
   endif()
 ELSE()
-  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -Wall")
+  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -Wall -Wno-deprecated-builtins")
 
   IF(APPLE)
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++ -Wall -fvisibility-inlines-hidden -fvisibility=hidden")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CPP_STANDARD} -Wno-deprecated-builtins -stdlib=libc++ -Wall")
   ELSE()
     if( NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" )
-      target_compile_options(fc PUBLIC -Wall -fnon-call-exceptions)
+      target_compile_options(fc PUBLIC ${CPP_STANDARD} -Wall -fnon-call-exceptions)
     endif()
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -fnon-call-exceptions")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CPP_STANDARD} -Wno-deprecated-builtins -Wall -fnon-call-exceptions")
 
     if( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" )
         if( CMAKE_CXX_COMPILER_VERSION VERSION_EQUAL 4.0.0 OR CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 4.0.0 )
@@ -321,6 +394,15 @@ else()
   set( ZLIB_LIBRARIES "" )
 endif( ZLIB_FOUND )
 
+find_package( BZip2 )
+if( BZIP2_FOUND )
+   MESSAGE( STATUS "bzip2 found" )
+   add_definitions( -DHAS_BZIP2 )
+else()
+   MESSAGE( STATUS "bzip2 not found" )
+   set( BZIP2_LIBRARIES "" )
+endif( BZIP2_FOUND )
+
 # This will become unnecessary once we update to websocketpp which fixes upstream issue #395
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWEBSOCKETPP_STRICT_MASKING")
 
@@ -348,15 +430,18 @@ target_include_directories(fc
     ${CMAKE_CURRENT_SOURCE_DIR}/vendor/websocketpp
 
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/vendor/cyoencode-1.0.2/src
     ${CMAKE_CURRENT_SOURCE_DIR}/vendor/secp256k1-zkp
+    ${CMAKE_CURRENT_SOURCE_DIR}/vendor/equihash
+    ${CMAKE_CURRENT_SOURCE_DIR}/vendor/bitcoin/src
   )
 
 IF(NOT WIN32)
   set(LINK_USR_LOCAL_LIB -L/usr/local/lib)
 ENDIF()
-target_link_libraries( fc PUBLIC ${LINK_USR_LOCAL_LIB}  ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES} ${Boost_LIBRARIES}
+target_link_libraries( fc PUBLIC ${LINK_USR_LOCAL_LIB} equihash ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES} ${BZIP2_LIBRARIES} ${Boost_LIBRARIES}
                                  ${PLATFORM_SPECIFIC_LIBS} ${RPCRT4} ${CMAKE_DL_LIBS} ${rt_library}
-                                 ${editline_libraries} secp256k1 ${CMAKE_REQUIRED_LIBRARIES} )
+				 ${editline_libraries} ${ECC_LIB} )
 
 if(WIN32 AND MSVC)
     set_source_files_properties( src/network/http/websocket.cpp PROPERTIES COMPILE_FLAGS "/bigobj" )
@@ -374,8 +459,13 @@ ENDIF(MSVC)
 ENDIF()
 
 include_directories( vendor/websocketpp )
+include_directories( vendor/equihash )
 
-add_subdirectory(tests)
+OPTION( FC_TESTS "build FC test projects (ON OR OFF)" OFF )
+MESSAGE( STATUS "FC_TESTS: ${FC_TESTS}" )
+if( FC_TESTS )
+  add_subdirectory(tests)
+endif()
 
 if(MSVC)
    # add addtional import library on windows platform
@@ -452,5 +542,28 @@ if(MSVC)
 endif(MSVC)
 
 INCLUDE(CheckLibcxxAtomic)
+
+SET(OPENSSL_CONF_TARGET )
+IF(DEFINED CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+  SET (OPENSSL_CONF_TARGET ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+ELSE()
+  SET (OPENSSL_CONF_TARGET ${CMAKE_CURRENT_BINARY_DIR})
+ENDIF()
+
+    IF(WIN32)
+       IF("${OPENSSL_ROOT_DIR}" STREQUAL "")
+          get_filename_component(OPENSSL_ROOT_DIR "${OPENSSL_INCLUDE_DIR}/.." REALPATH)
+       ENDIF()
+       SET(OPENSSL_CONF_SOURCE "${OPENSSL_ROOT_DIR}/ssl/openssl.cnf")
+       IF(MINGW)
+          SET(OPENSSL_CONF_SOURCE "${OPENSSL_ROOT_DIR}/openssl.cnf")
+       ENDIF(MINGW)
+       SET(POST_BUILD_STEP_COMMANDS ${POST_BUILD_STEP_COMMANDS}
+           COMMAND ${CMAKE_COMMAND} -E copy_if_different "${OPENSSL_CONF_SOURCE}" "${OPENSSL_CONF_TARGET}/openssl.cnf")
+    ENDIF(WIN32)
+
+ADD_CUSTOM_COMMAND(TARGET fc POST_BUILD ${POST_BUILD_STEP_COMMANDS}
+  COMMENT "Copying OpenSSL/ssl/openssl.cnf into target directory."
+)
 
 MESSAGE(STATUS "Finished fc module configuration...")

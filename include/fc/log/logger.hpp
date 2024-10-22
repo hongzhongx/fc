@@ -1,13 +1,14 @@
 #pragma once
-#include <fc/config.hpp>
+#include <fc/string.hpp>
 #include <fc/time.hpp>
-#include <fc/log/appender.hpp>
+#include <fc/shared_ptr.hpp>
 #include <fc/log/log_message.hpp>
-#include <cstddef>
-#include <memory>
 
 namespace fc
 {
+
+   class appender;
+
    /**
     *
     *
@@ -31,8 +32,8 @@ namespace fc
          ~logger();
          logger& operator=(const logger&);
          logger& operator=(logger&&);
-         friend bool operator==( const logger&, std::nullptr_t );
-         friend bool operator!=( const logger&, std::nullptr_t );
+         friend bool operator==( const logger&, nullptr_t );
+         friend bool operator!=( const logger&, nullptr_t );
 
          logger&    set_log_level( log_level e );
          log_level  get_log_level()const;
@@ -42,16 +43,16 @@ namespace fc
          void  set_name( const std::string& n );
          const std::string& name()const;
 
-         void add_appender( const appender::ptr& a );
-         std::vector<appender::ptr> get_appenders()const;
-         void remove_appender( const appender::ptr& a );
+         void add_appender( const fc::shared_ptr<appender>& a );
+         std::vector<fc::shared_ptr<appender> > get_appenders()const;
+         void remove_appender( const fc::shared_ptr<appender>& a );
 
          bool is_enabled( log_level e )const;
          void log( log_message m );
 
       private:
          class impl;
-         std::shared_ptr<impl> my;
+         fc::shared_ptr<impl> my;
    };
 
 } // namespace fc
@@ -144,7 +145,7 @@ namespace fc
   BOOST_PP_STRINGIZE(base) ": ${" BOOST_PP_STRINGIZE( base ) "} "
 
 #define FC_FORMAT_ARGS(r, unused, base) \
-  BOOST_PP_LPAREN() BOOST_PP_STRINGIZE(base),fc::variant(base,FC_MAX_LOG_OBJECT_DEPTH) BOOST_PP_RPAREN()
+  BOOST_PP_LPAREN() BOOST_PP_STRINGIZE(base),fc::variant(base) BOOST_PP_RPAREN()
 
 #define FC_FORMAT( SEQ )\
     BOOST_PP_SEQ_FOR_EACH( FC_FORMAT_ARG, v, SEQ )
@@ -154,39 +155,14 @@ namespace fc
 #define FC_FORMAT_ARG_PARAMS( ... )\
     BOOST_PP_SEQ_FOR_EACH( FC_FORMAT_ARGS, v, __VA_ARGS__ )
 
-#define FC_DUMP_FORMAT_ARG_NAME(r, unused, base) \
-   "(" BOOST_PP_STRINGIZE(base) ")"
-
-#define FC_DUMP_FORMAT_ARG_NAMES( SEQ )\
-   BOOST_PP_SEQ_FOR_EACH( FC_DUMP_FORMAT_ARG_NAME, v, SEQ )
-
-// TODO FC_FORMAT_ARG_PARAMS(...) may throw exceptions when calling fc::variant(...) inside,
-//      as a quick-fix / workaround, we catch all exceptions here.
-//      However, to log as much info as possible, it's better to catch exceptions when processing each argument
+#define ddump( SEQ ) \
+    dlog( FC_FORMAT(SEQ), FC_FORMAT_ARG_PARAMS(SEQ) )
 #define idump( SEQ ) \
-do { \
-   try { \
-      ilog( FC_FORMAT(SEQ), FC_FORMAT_ARG_PARAMS(SEQ) ); \
-   } catch( ... ) { \
-      ilog ( "[ERROR: Got exception while trying to dump ( ${args} )]",("args",FC_DUMP_FORMAT_ARG_NAMES(SEQ)) ); \
-   } \
-} while( false )
+    ilog( FC_FORMAT(SEQ), FC_FORMAT_ARG_PARAMS(SEQ) )
 #define wdump( SEQ ) \
-do { \
-   try { \
-      wlog( FC_FORMAT(SEQ), FC_FORMAT_ARG_PARAMS(SEQ) ); \
-   } catch( ... ) { \
-      wlog ( "[ERROR: Got exception while trying to dump ( ${args} )]",("args",FC_DUMP_FORMAT_ARG_NAMES(SEQ)) ); \
-   } \
-} while( false )
+    wlog( FC_FORMAT(SEQ), FC_FORMAT_ARG_PARAMS(SEQ) )
 #define edump( SEQ ) \
-do { \
-   try { \
-      elog( FC_FORMAT(SEQ), FC_FORMAT_ARG_PARAMS(SEQ) ); \
-   } catch( ... ) { \
-      elog ( "[ERROR: Got exception while trying to dump ( ${args} )]",("args",FC_DUMP_FORMAT_ARG_NAMES(SEQ)) ); \
-   } \
-} while( false )
+    elog( FC_FORMAT(SEQ), FC_FORMAT_ARG_PARAMS(SEQ) )
 
 // this disables all normal logging statements -- not something you'd normally want to do,
 // but it's useful if you're benchmarking something and suspect logging is causing

@@ -11,13 +11,8 @@
 #include <fc/reflect/variant.hpp>
 #include <algorithm>
 
-#if defined(__APPLE__) or defined(__OpenBSD__)
-#include <boost/multiprecision/integer.hpp>
-#endif
-
 namespace fc
 {
-
 /**
  *  The TypeID is stored in the 'last byte' of the variant.
  */
@@ -32,150 +27,143 @@ variant::variant()
    set_variant_type( this, null_type );
 }
 
-variant::variant( std::nullptr_t, uint32_t max_depth )
+variant::variant( fc::nullptr_t )
 {
    set_variant_type( this, null_type );
 }
 
-variant::variant( uint8_t val, uint32_t max_depth )
+variant::variant( uint8_t val )
 {
    *reinterpret_cast<uint64_t*>(this)  = val;
    set_variant_type( this, uint64_type );
 }
 
-variant::variant( int8_t val, uint32_t max_depth )
+variant::variant( int8_t val )
 {
    *reinterpret_cast<int64_t*>(this)  = val;
    set_variant_type( this, int64_type );
 }
 
-variant::variant( uint16_t val, uint32_t max_depth )
+variant::variant( uint16_t val )
 {
    *reinterpret_cast<uint64_t*>(this)  = val;
    set_variant_type( this, uint64_type );
 }
 
-variant::variant( int16_t val, uint32_t max_depth )
+variant::variant( int16_t val )
 {
    *reinterpret_cast<int64_t*>(this)  = val;
    set_variant_type( this, int64_type );
 }
 
-variant::variant( uint32_t val, uint32_t max_depth )
+variant::variant( uint32_t val )
 {
    *reinterpret_cast<uint64_t*>(this)  = val;
    set_variant_type( this, uint64_type );
 }
 
-variant::variant( int32_t val, uint32_t max_depth )
+variant::variant( int32_t val )
 {
    *reinterpret_cast<int64_t*>(this)  = val;
    set_variant_type( this, int64_type );
 }
 
-variant::variant( uint64_t val, uint32_t max_depth )
+variant::variant( uint64_t val )
 {
    *reinterpret_cast<uint64_t*>(this)  = val;
    set_variant_type( this, uint64_type );
 }
 
-#if defined(__APPLE__) or defined(__OpenBSD__)
-variant::variant( size_t val, uint32_t max_depth )
-{
-   *reinterpret_cast<uint64_t*>(this)  = val;
-   set_variant_type( this, uint64_type );
-}
-#endif
-
-variant::variant( int64_t val, uint32_t max_depth )
+variant::variant( int64_t val )
 {
    *reinterpret_cast<int64_t*>(this)  = val;
    set_variant_type( this, int64_type );
 }
 
-variant::variant( float val, uint32_t max_depth )
+variant::variant( float val )
 {
    *reinterpret_cast<double*>(this)  = val;
    set_variant_type( this, double_type );
 }
 
-variant::variant( double val, uint32_t max_depth )
+variant::variant( double val )
 {
    *reinterpret_cast<double*>(this)  = val;
    set_variant_type( this, double_type );
 }
 
-variant::variant( bool val, uint32_t max_depth )
+variant::variant( bool val )
 {
    *reinterpret_cast<bool*>(this)  = val;
    set_variant_type( this, bool_type );
 }
 
-variant::variant( char* str, uint32_t max_depth )
+variant::variant( char* str )
 {
    *reinterpret_cast<string**>(this)  = new string( str );
    set_variant_type( this, string_type );
 }
 
-variant::variant( const char* str, uint32_t max_depth )
+variant::variant( const char* str )
 {
    *reinterpret_cast<string**>(this)  = new string( str );
    set_variant_type( this, string_type );
 }
 
 // TODO: do a proper conversion to utf8
-variant::variant( wchar_t* str, uint32_t max_depth )
+variant::variant( wchar_t* str )
 {
    size_t len = wcslen(str);
    boost::scoped_array<char> buffer(new char[len]);
    for (unsigned i = 0; i < len; ++i)
-      buffer[i] = (char)str[i];
+     buffer[i] = (char)str[i];
    *reinterpret_cast<string**>(this)  = new string(buffer.get(), len);
    set_variant_type( this, string_type );
 }
 
 // TODO: do a proper conversion to utf8
-variant::variant( const wchar_t* str, uint32_t max_depth )
+variant::variant( const wchar_t* str )
 {
    size_t len = wcslen(str);
    boost::scoped_array<char> buffer(new char[len]);
    for (unsigned i = 0; i < len; ++i)
-      buffer[i] = (char)str[i];
+     buffer[i] = (char)str[i];
    *reinterpret_cast<string**>(this)  = new string(buffer.get(), len);
    set_variant_type( this, string_type );
 }
 
-variant::variant( std::string val, uint32_t max_depth )
+variant::variant( std::string val )
 {
-   *reinterpret_cast<string**>(this)  = new string( std::move(val) );
+   *reinterpret_cast<string**>(this)  = new string( fc::move(val) );
    set_variant_type( this, string_type );
 }
-variant::variant( blob val, uint32_t max_depth )
+variant::variant( blob val )
 {
-   *reinterpret_cast<blob**>(this)  = new blob( std::move(val) );
+   *reinterpret_cast<blob**>(this)  = new blob( fc::move(val) );
    set_variant_type( this, blob_type );
 }
 
-variant::variant( variant_object obj, uint32_t max_depth )
+variant::variant( variant_object obj)
 {
-   *reinterpret_cast<variant_object**>(this) = new variant_object(std::move(obj));
+   *reinterpret_cast<variant_object**>(this)  = new variant_object(fc::move(obj));
    set_variant_type(this,  object_type );
 }
-variant::variant( mutable_variant_object obj, uint32_t max_depth )
+variant::variant( mutable_variant_object obj)
 {
-   *reinterpret_cast<variant_object**>(this) = new variant_object(std::move(obj));
+   *reinterpret_cast<variant_object**>(this)  = new variant_object(fc::move(obj));
    set_variant_type(this,  object_type );
 }
 
-variant::variant( variants arr, uint32_t max_depth )
+variant::variant( variants arr )
 {
-   *reinterpret_cast<variants**>(this)  = new variants(std::move(arr));
+   *reinterpret_cast<variants**>(this)  = new variants(fc::move(arr));
    set_variant_type(this,  array_type );
 }
 
-typedef const variant_object* const_variant_object_ptr; 
-typedef const variants* const_variants_ptr; 
-typedef const blob*   const_blob_ptr; 
+
+typedef const variant_object* const_variant_object_ptr;
+typedef const variants* const_variants_ptr;
+typedef const blob*   const_blob_ptr;
 typedef const string* const_string_ptr;
 
 void variant::clear()
@@ -197,22 +185,22 @@ void variant::clear()
    set_variant_type( this, null_type );
 }
 
-variant::variant( const variant& v, uint32_t max_depth )
+variant::variant( const variant& v )
 {
    switch( v.get_type() )
    {
        case object_type:
-          *reinterpret_cast<variant_object**>(this)  = 
+          *reinterpret_cast<variant_object**>(this)  =
              new variant_object(**reinterpret_cast<const const_variant_object_ptr*>(&v));
           set_variant_type( this, object_type );
           return;
        case array_type:
-          *reinterpret_cast<variants**>(this)  = 
+          *reinterpret_cast<variants**>(this)  =
              new variants(**reinterpret_cast<const const_variants_ptr*>(&v));
           set_variant_type( this,  array_type );
           return;
        case string_type:
-          *reinterpret_cast<string**>(this)  = 
+          *reinterpret_cast<string**>(this)  =
              new string(**reinterpret_cast<const const_string_ptr*>(&v) );
           set_variant_type( this, string_type );
           return;
@@ -221,7 +209,7 @@ variant::variant( const variant& v, uint32_t max_depth )
    }
 }
 
-variant::variant( variant&& v, uint32_t max_depth )
+variant::variant( variant&& v )
 {
    memcpy( this, &v, sizeof(v) );
    set_variant_type( &v, null_type );
@@ -237,24 +225,24 @@ variant& variant::operator=( variant&& v )
    if( this == &v ) return *this;
    clear();
    memcpy( (char*)this, (char*)&v, sizeof(v) );
-   set_variant_type( &v, null_type ); 
+   set_variant_type( &v, null_type );
    return *this;
 }
 
 variant& variant::operator=( const variant& v )
 {
-   if( this == &v ) 
+   if( this == &v )
       return *this;
 
    clear();
    switch( v.get_type() )
    {
       case object_type:
-         *reinterpret_cast<variant_object**>(this)  = 
+         *reinterpret_cast<variant_object**>(this)  =
             new variant_object((**reinterpret_cast<const const_variant_object_ptr*>(&v)));
          break;
       case array_type:
-         *reinterpret_cast<variants**>(this)  = 
+         *reinterpret_cast<variants**>(this)  =
             new variants((**reinterpret_cast<const const_variants_ptr*>(&v)));
          break;
       case string_type:
@@ -379,7 +367,7 @@ int64_t variant::as_int64()const
    switch( get_type() )
    {
       case string_type:
-          return to_int64(**reinterpret_cast<const const_string_ptr*>(this)); 
+          return to_int64(**reinterpret_cast<const const_string_ptr*>(this));
       case double_type:
           return int64_t(*reinterpret_cast<const double*>(this));
       case int64_type:
@@ -400,7 +388,7 @@ uint64_t variant::as_uint64()const
    switch( get_type() )
    {
       case string_type:
-          return to_uint64(**reinterpret_cast<const const_string_ptr*>(this)); 
+          return to_uint64(**reinterpret_cast<const const_string_ptr*>(this));
       case double_type:
           return static_cast<uint64_t>(*reinterpret_cast<const double*>(this));
       case int64_type:
@@ -422,7 +410,7 @@ double  variant::as_double()const
    switch( get_type() )
    {
       case string_type:
-          return to_double(**reinterpret_cast<const const_string_ptr*>(this)); 
+          return to_double(**reinterpret_cast<const const_string_ptr*>(this));
       case double_type:
           return *reinterpret_cast<const double*>(this);
       case int64_type:
@@ -471,13 +459,13 @@ string    variant::as_string()const
    switch( get_type() )
    {
       case string_type:
-          return **reinterpret_cast<const const_string_ptr*>(this); 
+          return **reinterpret_cast<const const_string_ptr*>(this);
       case double_type:
-          return to_string(*reinterpret_cast<const double*>(this)); 
+          return to_string(*reinterpret_cast<const double*>(this));
       case int64_type:
-          return to_string(*reinterpret_cast<const int64_t*>(this)); 
+          return to_string(*reinterpret_cast<const int64_t*>(this));
       case uint64_type:
-          return to_string(*reinterpret_cast<const uint64_t*>(this)); 
+          return to_string(*reinterpret_cast<const uint64_t*>(this));
       case bool_type:
           return *reinterpret_cast<const bool*>(this) ? "true" : "false";
       case blob_type:
@@ -491,27 +479,27 @@ string    variant::as_string()const
    }
 }
 
-                            
+
 /// @throw if get_type() != array_type | null_type
 variants&         variant::get_array()
 {
   if( get_type() == array_type )
      return **reinterpret_cast<variants**>(this);
-   
+
   FC_THROW_EXCEPTION( bad_cast_exception, "Invalid cast from ${type} to Array", ("type",get_type()) );
 }
 blob&         variant::get_blob()
 {
   if( get_type() == blob_type )
      return **reinterpret_cast<blob**>(this);
-   
+
   FC_THROW_EXCEPTION( bad_cast_exception, "Invalid cast from ${type} to Blob", ("type",get_type()) );
 }
 const blob&         variant::get_blob()const
 {
   if( get_type() == blob_type )
      return **reinterpret_cast<const const_blob_ptr*>(this);
-   
+
   FC_THROW_EXCEPTION( bad_cast_exception, "Invalid cast from ${type} to Blob", ("type",get_type()) );
 }
 
@@ -541,7 +529,7 @@ blob variant::as_blob()const
 }
 
 
-/// @throw if get_type() != array_type 
+/// @throw if get_type() != array_type
 const variants&       variant::get_array()const
 {
   if( get_type() == array_type )
@@ -579,7 +567,7 @@ const string&        variant::get_string()const
   FC_THROW_EXCEPTION( bad_cast_exception, "Invalid cast from type '${type}' to Object", ("type",get_type()) );
 }
 
-/// @throw if get_type() != object_type 
+/// @throw if get_type() != object_type
 const variant_object&  variant::get_object()const
 {
   if( get_type() == object_type )
@@ -587,86 +575,92 @@ const variant_object&  variant::get_object()const
   FC_THROW_EXCEPTION( bad_cast_exception, "Invalid cast from type '${type}' to Object", ("type",get_type()) );
 }
 
-void from_variant( const variant& var, variants& vo, uint32_t max_depth )
+void from_variant( const variant& var,  variants& vo )
 {
    vo = var.get_array();
 }
 
-void from_variant( const variant& var, variant& vo, uint32_t max_depth ) { vo = var; }
+//void from_variant( const variant& var,  variant_object& vo )
+//{
+//   vo  = var.get_object();
+//}
 
-void to_variant( const uint8_t& var, variant& vo, uint32_t max_depth )  { vo = uint64_t(var); }
+void from_variant( const variant& var,  variant& vo ) { vo = var; }
+
+void to_variant( const uint8_t& var,  variant& vo )  { vo = uint64_t(var); }
 // TODO: warn on overflow?
-void from_variant( const variant& var, uint8_t& vo, uint32_t max_depth ){ vo = static_cast<uint8_t>(var.as_uint64()); }
+void from_variant( const variant& var,  uint8_t& vo ){ vo = static_cast<uint8_t>(var.as_uint64()); }
 
-void to_variant( const int8_t& var, variant& vo, uint32_t max_depth )   { vo = int64_t(var); }
+void to_variant( const int8_t& var,  variant& vo )  { vo = int64_t(var); }
 // TODO: warn on overflow?
-void from_variant( const variant& var, int8_t& vo, uint32_t max_depth ) { vo = static_cast<int8_t>(var.as_int64()); }
+void from_variant( const variant& var,  int8_t& vo ){ vo = static_cast<int8_t>(var.as_int64()); }
 
-void to_variant( const uint16_t& var, variant& vo, uint32_t max_depth ) { vo = uint64_t(var); }
+void to_variant( const uint16_t& var,  variant& vo )  { vo = uint64_t(var); }
 // TODO: warn on overflow?
-void from_variant( const variant& var, uint16_t& vo, uint32_t max_depth ){ vo = static_cast<uint16_t>(var.as_uint64()); }
+void from_variant( const variant& var,  uint16_t& vo ){ vo = static_cast<uint16_t>(var.as_uint64()); }
 
-void to_variant( const int16_t& var, variant& vo, uint32_t max_depth )  { vo = int64_t(var); }
+void to_variant( const int16_t& var,  variant& vo )  { vo = int64_t(var); }
 // TODO: warn on overflow?
-void from_variant( const variant& var, int16_t& vo, uint32_t max_depth ){ vo = static_cast<int16_t>(var.as_int64()); }
+void from_variant( const variant& var,  int16_t& vo ){ vo = static_cast<int16_t>(var.as_int64()); }
 
-void to_variant( const uint32_t& var, variant& vo, uint32_t max_depth ) { vo = uint64_t(var); }
-void from_variant( const variant& var, uint32_t& vo, uint32_t max_depth )
+void to_variant( const uint32_t& var,  variant& vo )  { vo = uint64_t(var); }
+void from_variant( const variant& var,  uint32_t& vo )
 {
    vo = static_cast<uint32_t>(var.as_uint64());
 }
 
-void to_variant( const int32_t& var, variant& vo, uint32_t max_depth )  { vo = int64_t(var); }
-void from_variant( const variant& var,int32_t& vo, uint32_t max_depth )
+void to_variant( const int32_t& var,  variant& vo )  { vo = int64_t(var); }
+void from_variant( const variant& var,  int32_t& vo )
 {
    vo = static_cast<int32_t>(var.as_int64());
 }
 
-void to_variant( const int64_t& var, variant& vo, uint32_t max_depth )  { vo = var; }
-void from_variant( const variant& var, int64_t& vo, uint32_t max_depth )
+void to_variant( const uint64_t& var, variant& vo ) { vo = var; }
+void from_variant( const variant& var,  int64_t& vo )
 {
    vo = var.as_int64();
 }
 
-void to_variant( const uint64_t& var, variant& vo, uint32_t max_depth )  { vo = var; }
-void from_variant( const variant& var, uint64_t& vo, uint32_t max_depth )
+void to_variant( const int64_t& var, variant& vo ) { vo = var; }
+void from_variant( const variant& var,  uint64_t& vo )
 {
    vo = var.as_uint64();
 }
 
-void to_variant( const bool& var, variant& vo, uint32_t max_depth )  { vo = uint64_t(var); }
-void from_variant( const variant& var, bool& vo, uint32_t max_depth )
+void to_variant( const bool& var, variant& vo ) { vo = uint64_t(var); }
+void from_variant( const variant& var,  bool& vo )
 {
    vo = var.as_bool();
 }
 
-void from_variant( const variant& var, double& vo, uint32_t max_depth )
+void to_variant( const double& var, variant& vo ) { vo = var; }
+void from_variant( const variant& var,  double& vo )
 {
    vo = var.as_double();
 }
 
-void from_variant( const variant& var, float& vo, uint32_t max_depth )
+void from_variant( const variant& var,  float& vo )
 {
    vo = static_cast<float>(var.as_double());
 }
 
-void to_variant( const std::string& s, variant& v, uint32_t max_depth )
+void to_variant( const std::string& s, variant& v )
 {
-    v = variant( std::string(s), max_depth );
+    v = variant( std::string(s) );
 }
 
-void from_variant( const variant& var, string& vo, uint32_t max_depth )
+void from_variant( const variant& var,  string& vo )
 {
    vo = var.as_string();
 }
 
-void to_variant( const std::vector<char>& var, variant& vo, uint32_t max_depth )
+void to_variant( const std::vector<char>& var,  variant& vo )
 {
   if( var.size() )
       vo = variant(to_hex(var.data(),var.size()));
   else vo = "";
 }
-void from_variant( const variant& var, std::vector<char>& vo, uint32_t max_depth )
+void from_variant( const variant& var,  std::vector<char>& vo )
 {
      auto str = var.as_string();
      vo.resize( str.size() / 2 );
@@ -675,40 +669,17 @@ void from_variant( const variant& var, std::vector<char>& vo, uint32_t max_depth
         size_t r = from_hex( str, vo.data(), vo.size() );
         FC_ASSERT( r == vo.size() );
      }
+//   std::string b64 = base64_decode( var.as_string() );
+//   vo = std::vector<char>( b64.c_str(), b64.c_str() + b64.size() );
 }
 
-void to_variant( const uint128_t& var, variant& vo, uint32_t max_depth )
-{
-#if defined(__APPLE__) or defined(__OpenBSD__)
-   boost::multiprecision::uint128_t helper = uint128_hi64( var );
-   helper <<= 64;
-   helper += uint128_lo64( var );
-   vo = boost::lexical_cast<std::string>( helper );
-#else
-   vo = boost::lexical_cast<std::string>( var );
-#endif
-}
+   #ifdef __APPLE__
+   #elif !defined(_MSC_VER)
+   void to_variant( long long int s, variant& v ) { v = variant( int64_t(s) ); }
+   void to_variant( unsigned long long int s, variant& v ) { v = variant( uint64_t(s)); }
+   #endif
 
-void from_variant( const variant& var, uint128_t& vo, uint32_t max_depth )
-{
-#if defined(__APPLE__) or defined(__OpenBSD__)
-   boost::multiprecision::uint128_t helper = boost::lexical_cast<boost::multiprecision::uint128_t>( var.as_string() );
-   vo = static_cast<uint64_t>( helper >> 64 );
-   vo <<= 64;
-   vo += static_cast<uint64_t>( helper & 0xffffffffffffffffULL );
-#else
-   vo = boost::lexical_cast<uint128_t>( var.as_string() );
-#endif
-}
-
-#if defined(__APPLE__) or defined(__OpenBSD__)
-   void to_variant( size_t s, variant& v, uint32_t max_depth ) { v = variant( uint64_t(s) ); }
-#elif !defined(_WIN32)
-   void to_variant( long long int s, variant& v, uint32_t max_depth ) { v = variant( int64_t(s) ); }
-   void to_variant( unsigned long long int s, variant& v, uint32_t max_depth ) { v = variant( uint64_t(s)); }
-#endif
-
-   bool operator == ( const variant& a, const variant& b )
+   variant operator == ( const variant& a, const variant& b )
    {
       if( a.is_string()  || b.is_string() ) return a.as_string() == b.as_string();
       if( a.is_double()  || b.is_double() ) return a.as_double() == b.as_double();
@@ -717,7 +688,7 @@ void from_variant( const variant& var, uint128_t& vo, uint32_t max_depth )
       return false;
    }
 
-   bool operator != ( const variant& a, const variant& b )
+   variant operator != ( const variant& a, const variant& b )
    {
       if( a.is_string()  || b.is_string() ) return a.as_string() != b.as_string();
       if( a.is_double()  || b.is_double() ) return a.as_double() != b.as_double();
@@ -726,12 +697,12 @@ void from_variant( const variant& var, uint128_t& vo, uint32_t max_depth )
       return false;
    }
 
-   bool operator ! ( const variant& a )
+   variant operator ! ( const variant& a )
    {
       return !a.as_bool();
    }
 
-   bool operator < ( const variant& a, const variant& b )
+   variant operator < ( const variant& a, const variant& b )
    {
       if( a.is_string()  || b.is_string() ) return a.as_string() < b.as_string();
       if( a.is_double()  || b.is_double() ) return a.as_double() < b.as_double();
@@ -740,7 +711,7 @@ void from_variant( const variant& var, uint128_t& vo, uint32_t max_depth )
       FC_ASSERT( false, "Invalid operation" );
    }
 
-   bool operator > ( const variant& a, const variant& b )
+   variant operator > ( const variant& a, const variant& b )
    {
       if( a.is_string()  || b.is_string() ) return a.as_string() > b.as_string();
       if( a.is_double()  || b.is_double() ) return a.as_double() > b.as_double();
@@ -749,7 +720,7 @@ void from_variant( const variant& var, uint128_t& vo, uint32_t max_depth )
       FC_ASSERT( false, "Invalid operation" );
    }
 
-   bool operator <= ( const variant& a, const variant& b )
+   variant operator <= ( const variant& a, const variant& b )
    {
       if( a.is_string()  || b.is_string() ) return a.as_string() <= b.as_string();
       if( a.is_double()  || b.is_double() ) return a.as_double() <= b.as_double();

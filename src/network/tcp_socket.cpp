@@ -11,13 +11,6 @@
 # include <mstcpip.h>
 #endif
 
-#if defined __OpenBSD__
-# include <sys/types.h>
-# include <sys/sysctl.h>
-# include <netinet/tcp_timer.h>
-# include <netinet/tcp_var.h>
-#endif
-
 namespace fc {
 
   namespace detail
@@ -33,7 +26,7 @@ namespace fc {
       {}
       ~impl()
       {
-        if( _sock.is_open() ) 
+        if( _sock.is_open() )
           try
           {
             _sock.close();
@@ -41,18 +34,18 @@ namespace fc {
           catch( ... )
           {}
         if( _read_in_progress.valid() )
-          try 
-          { 
+          try
+          {
             _read_in_progress.wait();
           }
           catch ( ... )
           {
           }
         if( _write_in_progress.valid() )
-          try 
-          { 
+          try
+          {
             _write_in_progress.wait();
-          } 
+          }
           catch ( ... )
           {
           }
@@ -97,13 +90,13 @@ namespace fc {
 
   tcp_socket::tcp_socket(){};
 
-  tcp_socket::~tcp_socket() {}
+  tcp_socket::~tcp_socket(){};
 
   void tcp_socket::flush() {}
   void tcp_socket::close() {
     try {
         if( is_open() )
-        { 
+        {
           my->_sock.close();
         }
     } FC_RETHROW_EXCEPTIONS( warn, "error closing tcp socket" );
@@ -113,12 +106,12 @@ namespace fc {
     return !my->_sock.is_open();
   }
 
-  size_t tcp_socket::writesome(const char* buf, size_t len) 
+  size_t tcp_socket::writesome(const char* buf, size_t len)
   {
     return my->_io_hooks->writesome(my->_sock, buf, len);
   }
 
-  size_t tcp_socket::writesome(const std::shared_ptr<const char>& buf, size_t len, size_t offset) 
+  size_t tcp_socket::writesome(const std::shared_ptr<const char>& buf, size_t len, size_t offset)
   {
     return my->_io_hooks->writesome(my->_sock, buf, len, offset);
   }
@@ -129,7 +122,7 @@ namespace fc {
     {
       auto rep = my->_sock.remote_endpoint();
       return  fc::ip::endpoint(rep.address().to_v4().to_ulong(), rep.port() );
-    } 
+    }
     FC_RETHROW_EXCEPTIONS( warn, "error getting socket's remote endpoint" );
   }
 
@@ -140,11 +133,11 @@ namespace fc {
     {
       auto boost_local_endpoint = my->_sock.local_endpoint();
       return fc::ip::endpoint(boost_local_endpoint.address().to_v4().to_ulong(), boost_local_endpoint.port() );
-    } 
+    }
     FC_RETHROW_EXCEPTIONS( warn, "error getting socket's local endpoint" );
   }
 
-  size_t tcp_socket::readsome( char* buf, size_t len ) 
+  size_t tcp_socket::readsome( char* buf, size_t len )
   {
     return my->_io_hooks->readsome(my->_sock, buf, len);
   }
@@ -154,7 +147,7 @@ namespace fc {
   }
 
   void tcp_socket::connect_to( const fc::ip::endpoint& remote_endpoint ) {
-    fc::asio::tcp::connect(my->_sock, fc::asio::tcp::endpoint( boost::asio::ip::address_v4(remote_endpoint.get_address()), remote_endpoint.port() ) ); 
+    fc::asio::tcp::connect(my->_sock, fc::asio::tcp::endpoint( boost::asio::ip::address_v4(remote_endpoint.get_address()), remote_endpoint.port() ) );
   }
 
   void tcp_socket::bind(const fc::ip::endpoint& local_endpoint)
@@ -173,7 +166,7 @@ namespace fc {
 
   void tcp_socket::enable_keep_alives(const fc::microseconds& interval)
   {
-    if (interval.count() > 0)
+    if (interval.count())
     {
       boost::asio::socket_base::keep_alive option(true);
       my->_sock.set_option(option);
@@ -193,37 +186,16 @@ namespace fc {
       if (setsockopt(my->_sock.native_handle(), IPPROTO_TCP,
       #if defined( __APPLE__ )
                      TCP_KEEPALIVE,
-       #elif defined( __OpenBSD__ )
-                     SO_KEEPALIVE,
        #else
-                     TCP_KEEPIDLE, 
+                     TCP_KEEPIDLE,
        #endif
                      (char*)&timeout_sec, sizeof(timeout_sec)) < 0)
         wlog("Error setting TCP keepalive idle time");
-# if defined(__OpenBSD__)
-        int name[4];
-        name[0] = CTL_NET;
-        name[1] = PF_INET;
-        name[2] = IPPROTO_TCP;
-
-        int value;
-        size_t sz;
-
-        // get tics per second
-        name[3] = TCPCTL_SLOWHZ;
-        if (sysctl(name, 4, &value, &sz, NULL, 0) == -1)
-          wlog("Error setting TCP keepalive interval");
-
-        // set interval
-        value *= timeout_sec;
-        name[3] = TCPCTL_KEEPINTVL;
-        if (sysctl(name, 4, NULL, NULL, &value, sizeof(value)) == -1)
-          wlog("Error setting TCP keepalive interval");
-# elif !defined(__APPLE__) || defined(TCP_KEEPINTVL) // TCP_KEEPINTVL not defined before 10.9
+# if !defined(__APPLE__) || defined(TCP_KEEPINTVL) // TCP_KEEPINTVL not defined before 10.9
       if (setsockopt(my->_sock.native_handle(), IPPROTO_TCP, TCP_KEEPINTVL,
                      (char*)&timeout_sec, sizeof(timeout_sec)) < 0)
         wlog("Error setting TCP keepalive interval");
-# endif // (__OpenBSD__) or (!__APPLE__ || TCP_KEEPINTVL)
+# endif // !__APPLE__ || TCP_KEEPINTVL
 #endif // !WIN32
     }
     else
@@ -276,7 +248,7 @@ namespace fc {
       ~impl(){
         try {
           _accept.close();
-        } 
+        }
         catch ( boost::system::system_error& )
         {
            wlog( "unexpected exception ${e}", ("e", fc::except_str()) );
@@ -286,7 +258,7 @@ namespace fc {
       boost::asio::ip::tcp::acceptor _accept;
   };
   void tcp_server::close() {
-    if( my && my->_accept.is_open() ) 
+    if( my && my->_accept.is_open() )
       my->_accept.close();
     delete my;
     my = nullptr;
@@ -299,17 +271,17 @@ namespace fc {
   }
 
 
-  void tcp_server::accept( tcp_socket& s ) 
+  void tcp_server::accept( tcp_socket& s )
   {
     try
     {
       FC_ASSERT( my != nullptr );
-      fc::asio::tcp::accept( my->_accept, s.my->_sock  ); 
+      fc::asio::tcp::accept( my->_accept, s.my->_sock  );
     } FC_RETHROW_EXCEPTIONS( warn, "Unable to accept connection on socket." );
   }
   void tcp_server::set_reuse_address(bool enable /* = true */)
   {
-    if( !my ) 
+    if( !my )
       my = new impl;
     boost::asio::ip::tcp::acceptor::reuse_address option(enable);
     my->_accept.set_option(option);
@@ -330,33 +302,33 @@ namespace fc {
     }
 #endif // __APPLE__
   }
-  void tcp_server::listen( uint16_t port ) 
+  void tcp_server::listen( uint16_t port )
   {
-    if( !my ) 
+    if( !my )
       my = new impl;
     try
     {
       my->_accept.bind(boost::asio::ip::tcp::endpoint(boost::asio::ip::address_v4(), port));
       my->_accept.listen(256);
-    } 
+    }
     FC_RETHROW_EXCEPTIONS(warn, "error listening on socket");
   }
-  void tcp_server::listen( const fc::ip::endpoint& ep ) 
+  void tcp_server::listen( const fc::ip::endpoint& ep )
   {
-    if( !my ) 
+    if( !my )
       my = new impl;
     try
     {
       my->_accept.bind(boost::asio::ip::tcp::endpoint(boost::asio::ip::address_v4::from_string((string)ep.get_address()), ep.port()));
       my->_accept.listen();
-    } 
+    }
     FC_RETHROW_EXCEPTIONS(warn, "error listening on socket");
   }
 
   fc::ip::endpoint tcp_server::get_local_endpoint() const
   {
     FC_ASSERT( my != nullptr );
-    return fc::ip::endpoint(my->_accept.local_endpoint().address().to_v4().to_ulong(), 
+    return fc::ip::endpoint(my->_accept.local_endpoint().address().to_v4().to_ulong(),
                             my->_accept.local_endpoint().port() );
   }
 
@@ -368,4 +340,4 @@ namespace fc {
 
 
 
-} // namespace fc 
+} // namespace fc

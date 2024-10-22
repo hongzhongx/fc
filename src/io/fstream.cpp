@@ -10,14 +10,12 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem/fstream.hpp>
 
-using namespace std;
-
 namespace fc {
-   class ofstream::impl {
+   class ofstream::impl : public fc::retainable {
       public:
          boost::filesystem::ofstream ofs;
    };
-   class ifstream::impl {
+   class ifstream::impl : public fc::retainable {
       public:
          boost::filesystem::ifstream ifs;
    };
@@ -25,13 +23,13 @@ namespace fc {
    ofstream::ofstream()
    :my( new impl() ){}
 
-   ofstream::ofstream( const fc::path& file, std::ios_base::openmode m )
+   ofstream::ofstream( const fc::path& file, int m )
    :my( new impl() ) { this->open( file, m ); }
    ofstream::~ofstream(){}
 
-   void ofstream::open( const fc::path& file, std::ios_base::openmode m ) {
+   void ofstream::open( const fc::path& file, int m ) {
      const boost::filesystem::path& bfp = file; 
-     my->ofs.open( bfp, std::ios_base::out | std::ios_base::binary | m );
+     my->ofs.open( bfp, std::ios::binary );
    }
    size_t ofstream::writesome( const char* buf, size_t len ) {
         my->ofs.write(buf,len);
@@ -65,17 +63,11 @@ namespace fc {
      const boost::filesystem::path& bfp = file; 
       my->ifs.open( bfp, std::ios::binary );
    }
-
    size_t ifstream::readsome( char* buf, size_t len ) {
       auto s = size_t(my->ifs.readsome( buf, len ));
-      if( s <= 0 ) 
-      {
+      if( s <= 0 ) {
          read( buf, 1 );
          s = 1;
-         if (len > 1)
-         {
-            s += size_t(my->ifs.readsome( &buf[1], len - 1));
-         }
       }
       return s;
    }

@@ -1,7 +1,8 @@
 #pragma once
-#include <memory>
-#include <string>
+#include <fc/string.hpp>
+
 #include <vector>
+#include <memory>
 
 namespace fc { 
   namespace ip { class endpoint; }
@@ -12,7 +13,7 @@ namespace fc {
      struct header 
      {
        header( std::string k, std::string v )
-       :key(std::move(k)),val(std::move(v)){}
+       :key(fc::move(k)),val(fc::move(v)){}
        header(){}
        std::string key;
        std::string val;
@@ -25,7 +26,6 @@ namespace fc {
         enum status_code {
             OK                  = 200,
             RecordCreated       = 201,
-            NoContent           = 204,
             BadRequest          = 400,
             NotAuthorized       = 401,
             NotFound            = 404,
@@ -36,7 +36,6 @@ namespace fc {
         int                     status;
         std::vector<header>      headers;
         std::vector<char>        body;
-        std::string              body_as_string;
      };
      
      struct request 
@@ -81,4 +80,4 @@ namespace fc {
 
 #include <fc/reflect/reflect.hpp>
 FC_REFLECT( fc::http::header, (key)(val) )
-FC_REFLECT( fc::http::reply, (status)(headers)(body)(body_as_string) )
+

@@ -1,5 +1,4 @@
 #pragma once
-#include <algorithm>
 #include <fc/exception/exception.hpp>
 #include <fc/io/raw_fwd.hpp>
 #include <fc/variant_object.hpp>
@@ -11,61 +10,55 @@ namespace fc { namespace raw {
     class variant_packer : public variant::visitor
     {
        public:
-         variant_packer( Stream& _s, uint32_t _max_depth ):s(_s),max_depth(_max_depth - 1)
-         {
-            FC_ASSERT( _max_depth > 0 );
-         }
+         variant_packer( Stream& _s ):s(_s){}
          virtual void handle()const { }
          virtual void handle( const int64_t& v )const
          {
-            fc::raw::pack( s, v, max_depth );
+            fc::raw::pack( s, v );
          }
          virtual void handle( const uint64_t& v )const
          {
-            fc::raw::pack( s, v, max_depth );
+            fc::raw::pack( s, v );
          }
-         virtual void handle( const double& v )const
+         virtual void handle( const double& v )const 
          {
-            FC_THROW_EXCEPTION( invalid_arg_exception, "Can't pack double!" );
+            fc::raw::pack( s, v );
          }
          virtual void handle( const bool& v )const
          {
-            fc::raw::pack( s, v, max_depth );
+            fc::raw::pack( s, v );
          }
          virtual void handle( const string& v )const
          {
-            fc::raw::pack( s, v, max_depth );
+            fc::raw::pack( s, v );
          }
          virtual void handle( const variant_object& v)const
          {
-            fc::raw::pack( s, v, max_depth );
+            fc::raw::pack( s, v );
          }
          virtual void handle( const variants& v)const
          {
-            fc::raw::pack( s, v, max_depth );
+            fc::raw::pack( s, v );
          }
-
+        
          Stream& s;
-         const uint32_t max_depth;
-
+        
     };
 
 
-    template<typename Stream>
-    inline void pack( Stream& s, const variant& v, uint32_t _max_depth )
+    template<typename Stream> 
+    inline void pack( Stream& s, const variant& v )
     {
-       FC_ASSERT( _max_depth > 0 );
-       --_max_depth;
-       pack( s, uint8_t(v.get_type()), _max_depth );
-       v.visit( variant_packer<Stream>( s, _max_depth ) );
+       pack( s, uint8_t(v.get_type()) );
+       v.visit( variant_packer<Stream>(s) );
     }
-    template<typename Stream>
-    inline void unpack( Stream& s, variant& v, uint32_t _max_depth )
+    template<typename Stream> 
+    inline void unpack( Stream& s, variant& v, uint32_t depth )
     {
-      FC_ASSERT( _max_depth > 0 );
-      --_max_depth;
+      depth++;
+      FC_ASSERT( depth <= MAX_RECURSION_DEPTH );
       uint8_t t;
-      unpack( s, t, _max_depth );
+      unpack( s, t, depth );
       switch( t )
       {
          case variant::null_type:
@@ -73,47 +66,50 @@ namespace fc { namespace raw {
          case variant::int64_type:
          {
             int64_t val;
-            raw::unpack( s, val, _max_depth );
+            raw::unpack(s,val,depth);
             v = val;
             return;
          }
          case variant::uint64_type:
          {
             uint64_t val;
-            raw::unpack( s, val, _max_depth );
+            raw::unpack(s,val,depth);
             v = val;
             return;
          }
          case variant::double_type:
          {
-            FC_THROW_EXCEPTION( invalid_arg_exception, "Can't unpack double!" );
+            double val;
+            raw::unpack(s,val,depth);
+            v = val;
+            return;
          }
          case variant::bool_type:
          {
             bool val;
-            raw::unpack( s, val, _max_depth );
+            raw::unpack(s,val,depth);
             v = val;
             return;
          }
          case variant::string_type:
          {
             std::string val;
-            raw::unpack( s, val, _max_depth );
-            v = std::move(val);
+            raw::unpack(s,val,depth);
+            v = fc::move(val);
             return;
          }
          case variant::array_type:
          {
             variants val;
-            raw::unpack( s, val, _max_depth );
-            v = std::move(val);
+            raw::unpack(s,val,depth);
+            v = fc::move(val);
             return;
          }
          case variant::object_type:
          {
-            variant_object val;
-            raw::unpack( s, val, _max_depth );
-            v = std::move(val);
+            variant_object val; 
+            raw::unpack(s,val,depth);
+            v = fc::move(val);
             return;
          }
          default:
@@ -121,37 +117,35 @@ namespace fc { namespace raw {
       }
     }
 
-    template<typename Stream>
-    inline void pack( Stream& s, const variant_object& v, uint32_t _max_depth )
+    template<typename Stream> 
+    inline void pack( Stream& s, const variant_object& v ) 
     {
-       FC_ASSERT( _max_depth > 0 );
-       --_max_depth;
-       unsigned_int vs = v.size();
-       pack( s, vs, _max_depth );
+       unsigned_int vs = (uint32_t)v.size();
+       pack( s, vs );
        for( auto itr = v.begin(); itr != v.end(); ++itr )
        {
-          pack( s, itr->key(), _max_depth );
-          pack( s, itr->value(), _max_depth );
+          pack( s, itr->key() );
+          pack( s, itr->value() );
        }
     }
-    template<typename Stream>
-    inline void unpack( Stream& s, variant_object& v, uint32_t _max_depth )
+    template<typename Stream> 
+    inline void unpack( Stream& s, variant_object& v, uint32_t depth )
     {
-       FC_ASSERT( _max_depth > 0 );
-       --_max_depth;
+       depth++;
+       FC_ASSERT( depth <= MAX_RECURSION_DEPTH );
        unsigned_int vs;
-       unpack( s, vs, _max_depth );
+       unpack( s, vs, depth );
+
        mutable_variant_object mvo;
-       mvo.reserve( std::min( vs.value, static_cast<uint64_t>(FC_MAX_PREALLOC_SIZE) ) );
        for( uint32_t i = 0; i < vs.value; ++i )
        {
           std::string key;
           fc::variant value;
-          fc::raw::unpack( s, key, _max_depth );
-          fc::raw::unpack( s, value, _max_depth );
-          mvo.set( std::move(key), std::move(value) );
+          fc::raw::unpack(s,key,depth);
+          fc::raw::unpack(s,value,depth);
+          mvo.set( fc::move(key), fc::move(value) );
        }
-       v = std::move(mvo);
+       v = fc::move(mvo);
     }
 
 } } // fc::raw
