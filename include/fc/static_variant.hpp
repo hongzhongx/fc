@@ -508,7 +508,7 @@ struct visitor {
    };
 
    template< typename... T >
-   struct get_typename
+   struct get_typename< static_variant< T... > >
    {
       static const char* name()
       {
