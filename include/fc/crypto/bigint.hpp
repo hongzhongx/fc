@@ -1,4 +1,5 @@
 #pragma once
+#include <vector>
 #include <stdint.h>
 #include <fc/string.hpp>
 
