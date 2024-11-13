@@ -89,6 +89,12 @@ ELSE( ECC_IMPL STREQUAL openssl )
   ENDIF( ECC_IMPL STREQUAL mixed )
 ENDIF( ECC_IMPL STREQUAL openssl )
 
+SET( COMMAND_PREFIX "" )
+IF( CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "x86_64" )
+  MESSAGE(STATUS "HOST_SYSTEM_PROCESSOR: ${CMAKE_HOST_SYSTEM_PROCESSOR}")
+  SET( COMMAND_PREFIX arch -x86_64 )
+ENDIF()
+
 # Configure secp256k1-zkp
 if ( WIN32 )
     # autoconf won't work here, hard code the defines
@@ -121,8 +127,8 @@ else ( WIN32 )
     ExternalProject_Add( project_secp256k1
      PREFIX ${CMAKE_CURRENT_BINARY_DIR}/vendor/secp256k1-zkp
      SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendor/secp256k1-zkp
-     CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/vendor/secp256k1-zkp/configure --prefix=${CMAKE_CURRENT_BINARY_DIR}/vendor/secp256k1-zkp --with-bignum=no
-     BUILD_COMMAND make
+     CONFIGURE_COMMAND ${COMMAND_PREFIX} ${CMAKE_CURRENT_SOURCE_DIR}/vendor/secp256k1-zkp/configure --prefix=${CMAKE_CURRENT_BINARY_DIR}/vendor/secp256k1-zkp --with-bignum=no
+     BUILD_COMMAND ${COMMAND_PREFIX} make
      INSTALL_COMMAND true
      BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/vendor/secp256k1-zkp/src/project_secp256k1-build/.libs/libsecp256k1.a
     )
@@ -150,8 +156,8 @@ if ( NOT WIN32 )
     ExternalProject_Add( project_editline
      PREFIX ${CMAKE_CURRENT_BINARY_DIR}/vendor/editline
      SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendor/editline
-     CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/vendor/editline/configure --prefix=${CMAKE_CURRENT_BINARY_DIR}/vendor/editline
-     BUILD_COMMAND make
+     CONFIGURE_COMMAND ${COMMAND_PREFIX} ${CMAKE_CURRENT_SOURCE_DIR}/vendor/editline/configure --prefix=${CMAKE_CURRENT_BINARY_DIR}/vendor/editline
+     BUILD_COMMAND ${COMMAND_PREFIX} make
      INSTALL_COMMAND true
      BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/vendor/editline/src/project_editline-build/src/.libs/libeditline.a
     )
@@ -546,20 +552,20 @@ ELSE()
   SET (OPENSSL_CONF_TARGET ${CMAKE_CURRENT_BINARY_DIR})
 ENDIF()
 
-    IF(WIN32)
-       IF("${OPENSSL_ROOT_DIR}" STREQUAL "")
-          get_filename_component(OPENSSL_ROOT_DIR "${OPENSSL_INCLUDE_DIR}/.." REALPATH)
-       ENDIF()
-       SET(OPENSSL_CONF_SOURCE "${OPENSSL_ROOT_DIR}/ssl/openssl.cnf")
-       IF(MINGW)
-          SET(OPENSSL_CONF_SOURCE "${OPENSSL_ROOT_DIR}/openssl.cnf")
-       ENDIF(MINGW)
-       SET(POST_BUILD_STEP_COMMANDS ${POST_BUILD_STEP_COMMANDS}
-           COMMAND ${CMAKE_COMMAND} -E copy_if_different "${OPENSSL_CONF_SOURCE}" "${OPENSSL_CONF_TARGET}/openssl.cnf")
-    ENDIF(WIN32)
+IF(WIN32)
+  IF("${OPENSSL_ROOT_DIR}" STREQUAL "")
+    get_filename_component(OPENSSL_ROOT_DIR "${OPENSSL_INCLUDE_DIR}/.." REALPATH)
+  ENDIF()
+  SET(OPENSSL_CONF_SOURCE "${OPENSSL_ROOT_DIR}/ssl/openssl.cnf")
+  IF(MINGW)
+    SET(OPENSSL_CONF_SOURCE "${OPENSSL_ROOT_DIR}/openssl.cnf")
+  ENDIF(MINGW)
+  SET(POST_BUILD_STEP_COMMANDS ${POST_BUILD_STEP_COMMANDS}
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different "${OPENSSL_CONF_SOURCE}" "${OPENSSL_CONF_TARGET}/openssl.cnf")
 
-ADD_CUSTOM_COMMAND(TARGET fc POST_BUILD ${POST_BUILD_STEP_COMMANDS}
-  COMMENT "Copying OpenSSL/ssl/openssl.cnf into target directory."
-)
+  ADD_CUSTOM_COMMAND(TARGET fc POST_BUILD ${POST_BUILD_STEP_COMMANDS}
+    COMMENT "Copying OpenSSL/ssl/openssl.cnf into target directory."
+  )
+ENDIF(WIN32)
 
 MESSAGE(STATUS "Finished fc module configuration...")
