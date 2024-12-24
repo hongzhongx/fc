@@ -131,7 +131,7 @@ else ( WIN32 )
      PREFIX ${CMAKE_CURRENT_BINARY_DIR}/vendor/secp256k1-zkp
      SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendor/secp256k1-zkp
      CONFIGURE_COMMAND ${COMMAND_PREFIX} ${CMAKE_CURRENT_SOURCE_DIR}/vendor/secp256k1-zkp/configure --prefix=${CMAKE_CURRENT_BINARY_DIR}/vendor/secp256k1-zkp --with-bignum=no
-     BUILD_COMMAND ${COMMAND_PREFIX} make
+     BUILD_COMMAND ${COMMAND_PREFIX} make -j1
      INSTALL_COMMAND true
      BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/vendor/secp256k1-zkp/src/project_secp256k1-build/.libs/libsecp256k1.a
     )
@@ -160,7 +160,7 @@ if ( NOT WIN32 )
      PREFIX ${CMAKE_CURRENT_BINARY_DIR}/vendor/editline
      SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendor/editline
      CONFIGURE_COMMAND ${COMMAND_PREFIX} ${CMAKE_CURRENT_SOURCE_DIR}/vendor/editline/configure --prefix=${CMAKE_CURRENT_BINARY_DIR}/vendor/editline
-     BUILD_COMMAND ${COMMAND_PREFIX} make
+     BUILD_COMMAND ${COMMAND_PREFIX} make -j1
      INSTALL_COMMAND true
      BUILD_BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/vendor/editline/src/project_editline-build/src/.libs/libeditline.a
     )
