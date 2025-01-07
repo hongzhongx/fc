@@ -69,7 +69,7 @@ namespace fc {
     // be deleted when p_this goes out of scope.  Consequently,
     // it would be Very Bad to let p_this go out of scope
     // before we're done reading/writing instance variables!
-    // See https://github.com/cryptonomex/taiyi/issues/597
+    // See https://github.com/cryptonomex/graphene/issues/597
     //
 
     ptr p_this = ptr( this, true );
