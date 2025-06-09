@@ -1,4 +1,5 @@
 #pragma once 
+#include <algorithm>
 #include <boost/container/flat_map.hpp>
 #include <boost/container/flat_set.hpp>
 #include <boost/interprocess/containers/vector.hpp>
