@@ -122,7 +122,7 @@ namespace fc { namespace ssh {
       fc::scoped_lock<fc::mutex> channel_open_lock(my->channel_open_mutex);
       fc::scoped_lock<fc::mutex> scp_send_lock(my->scp_send_mutex);
       chan = my->call_ssh2_ptr_function_throw<LIBSSH2_CHANNEL*>(boost::bind(libssh2_scp_send64, my->session, remote_path.generic_string().c_str(), 0700, fsize, now, now ));
-    } catch (fc::exception& er) {
+    } catch (const fc::exception& er) {
       FC_RETHROW_EXCEPTION(er, error, "scp ${local_file} to ${remote_file} failed", ("local_file", local_path)("remote_file",remote_path));
     }
     uint64_t total_bytes_written = 0;
@@ -409,7 +409,7 @@ namespace fc { namespace ssh {
       try {
         call_ssh2_function_throw(boost::bind(libssh2_session_handshake, session, sock->native()),
                                  "SSH Handshake error: ${code} - ${message}");
-      } catch (fc::exception& er) {
+      } catch (const fc::exception& er) {
         FC_RETHROW_EXCEPTION( er, error, "Error during SSH handshake" );;
       }
       //const char* fingerprint = libssh2_hostkey_hash(session, LIBSSH2_HOSTKEY_HASH_SHA1);
@@ -418,7 +418,7 @@ namespace fc { namespace ssh {
       // try to authenticate, throw on error.
       try {
         authenticate();
-      } catch (fc::exception& er) {
+      } catch (const fc::exception& er) {
         FC_RETHROW_EXCEPTION( er, error, "Error during SSH authentication" );;
       }
       //slog(".");

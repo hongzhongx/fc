@@ -324,7 +324,7 @@ namespace fc { namespace ssh {
           std::string command_line = sshc->my->remote_system_is_windows ? windows_shell_escape_command(exe, args) : unix_shell_escape_command(exe, args);
           sshc->my->call_ssh2_function_throw(boost::bind(libssh2_channel_process_startup, chan, "exec", sizeof("exec") - 1, command_line.c_str(), command_line.size()),
 					    "exec failed: ${message}"); // equiv to libssh2_channel_exec(chan, cmd) macro
-        } catch (fc::exception& er) {
+        } catch (const fc::exception& er) {
            elog( "error starting process" );
            FC_RETHROW_EXCEPTION(er, error, "error starting process");
         }
